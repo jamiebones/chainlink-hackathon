@@ -1,0 +1,33 @@
+{
+  "name": "chainlink-hackathon-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "contracts",
+    "subgraph",
+    "frontend"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "clean": "turbo run clean"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0"
+  },
+  "packageManager": "npm@10.0.0",
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "chainlink",
+    "hackathon",
+    "monorepo",
+    "web3"
+  ],
+  "author": "",
+  "license": "MIT",
+  "description": "Chainlink Hackathon Monorepo with contracts, subgraph, and frontend"
+}

@@ -1,0 +1,8 @@
+type ExampleEntity @entity {
+  id: ID!
+  count: BigInt!
+  user: Bytes! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+} 
