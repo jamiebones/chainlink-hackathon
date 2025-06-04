@@ -39,10 +39,9 @@ contract ChainlinkManager {
         return uint256(answer);
     }
 
-    function getDexPriceofAsset(Utils.Asset assetType) external view returns (uint256) {
+    function getDexPriceofAsset(
+        Utils.Asset assetType
+    ) external view returns (uint256) {
         return 1e18; //for now
-
     }
-
-
 }
