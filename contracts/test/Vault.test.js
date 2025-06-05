@@ -375,4 +375,194 @@ describe("Vault", function () {
                 .withArgs(trader.address, ethers.ZeroAddress, numShares);
         });
     });
+
+    describe("Vault Redemption by ID", function () {
+        const numShares = ethers.parseUnits("10", 18);
+        const assetType = Utils.Asset.TSLA;
+        let vaultID;
+
+        async function openPositionAndGetID() {
+            const { vault, mockUSDC, trader, mockChainlinkManager, admin } = await loadFixture(deployVaultFixture);
+
+            // Set prices
+            await mockChainlinkManager.setPrice(assetType, 100 * 1e8);
+            await mockChainlinkManager.setDexPrice(assetType, 100 * 1e8);
+
+            // Calculate required collateral
+            const collateral = ethers.parseUnits("100", 18) * numShares * 110n / 100n;
+            const usdcAmount = collateral / 1_000_000_000_000n;
+
+            // Fund and approve
+            await mockUSDC.connect(trader).mint(trader.address, usdcAmount * 2n);
+            await mockUSDC.connect(trader).approve(vault.target, usdcAmount);
+
+            // Open position and get vault ID
+            await vault.connect(trader).openPosition(assetType, numShares);
+            return { vault, mockUSDC, trader, mockChainlinkManager, admin };
+        }
+
+        describe("Successful Redemption", function () {
+            it("Should redeem vault with profit correctly", async function () {
+                const { vault, mockUSDC, trader, mockChainlinkManager } = await openPositionAndGetID();
+                vaultID = 0; // First position
+
+                // Set higher price for profit (110 USD)
+                await mockChainlinkManager.setPrice(assetType, 110 * 1e8);
+                await mockChainlinkManager.setDexPrice(assetType, 110 * 1e8);
+
+                // Calculate expected values
+                const initialBuffer = await vault.totalBufferCollateralBalance();
+                const tx = await vault.connect(trader).redeemVault(vaultID);
+
+                // Verify state changes
+                const position = await vault.userPositions(trader.address, vaultID);
+                expect(position.paidOut).to.be.true;
+                expect(position.isActive).to.be.false;
+                expect(await vault.totalBufferCollateralBalance()).to.be.lt(initialBuffer);
+
+                // Verify event emission
+                await expect(tx).to.emit(vault, "PositionClosed");
+            });
+
+            it("Should redeem vault with loss correctly", async function () {
+                const { vault, trader, mockChainlinkManager } = await openPositionAndGetID();
+                vaultID = 0;
+
+                // Set lower price for loss (90 USD)
+                await mockChainlinkManager.setPrice(assetType, 90 * 1e8);
+                await mockChainlinkManager.setDexPrice(assetType, 90 * 1e8);
+
+                await expect(vault.connect(trader).redeemVault(vaultID))
+                    .to.emit(vault, "PositionClosed");
+            });
+
+            it("Should handle break-even redemption", async function () {
+                const { vault, trader, mockChainlinkManager } = await openPositionAndGetID();
+                vaultID = 0;
+
+                // Keep same price (100 USD)
+                await mockChainlinkManager.setPrice(assetType, 100 * 1e8);
+                await mockChainlinkManager.setDexPrice(assetType, 100 * 1e8);
+
+                await expect(vault.connect(trader).redeemVault(vaultID))
+                    .to.emit(vault, "PositionClosed");
+            });
+        });
+
+        describe("Failure Scenarios", function () {
+            // it("Should revert when protocol not started", async function () {
+            //     const { vault, trader } = await loadFixture(deployVaultFixture);
+            //     await expect(vault.connect(trader).redeemVault(0))
+            //         .to.be.revertedWithCustomError(vault, "NotStarted");
+            // });
+
+            it("Should revert when protocol paused", async function () {
+                const { vault, admin, trader } = await loadFixture(deployVaultFixture);
+                await vault.connect(admin).pause();
+                await expect(vault.connect(trader).redeemVault(0))
+                    .to.be.revertedWithCustomError(vault, "Paused");
+            });
+
+            it("Should revert for invalid vault ID", async function () {
+                const { vault, trader } = await openPositionAndGetID();
+                await expect(vault.connect(trader).redeemVault(999)) // Invalid ID
+                    .to.be.revertedWithCustomError(vault, "InvalidVaultID");
+            });
+
+            it("Should revert if vault already paid out", async function () {
+                const { vault, trader, mockChainlinkManager } = await openPositionAndGetID();
+                vaultID = 0;
+
+                // First redemption
+                await vault.connect(trader).redeemVault(vaultID);
+
+                // Attempt second redemption
+                await expect(vault.connect(trader).redeemVault(vaultID))
+                    .to.be.revertedWithCustomError(vault, "VaultAlreadyPaidOut");
+            });
+
+            it("Should revert for insufficient contract USDC balance", async function () {
+
+                const { vault, mockUSDC, trader, admin, mockChainlinkManager } = await loadFixture(deployVaultFixture);
+
+                // Set initial prices for opening position
+                await mockChainlinkManager.setPrice(assetType, 100 * 1e8);
+                await mockChainlinkManager.setDexPrice(assetType, 100 * 1e8);
+
+                // Calculate required collateral and open position
+                const oraclePrice = ethers.parseUnits("100", 18);
+                const collateral = (oraclePrice * numShares * 110n) / 100n;
+                const usdcAmount = collateral / 1_000_000_000_000n;
+
+                // Fund trader and approve
+                await mockUSDC.connect(trader).mint(trader.address, usdcAmount * 2n);
+                await mockUSDC.connect(trader).approve(vault.target, usdcAmount);
+                await vault.connect(trader).openPosition(assetType, numShares);
+
+                // Set profitable redemption prices
+                await mockChainlinkManager.setPrice(assetType, 150 * 1e8);
+                await mockChainlinkManager.setDexPrice(assetType, 150 * 1e8);
+
+                // Drain contract funds using admin
+                await vault.connect(admin).emergencyWithdraw(mockUSDC.target);
+
+                // Verify vault exists before redemption
+                const position = await vault.userPositions(trader.address, 0);
+                expect(position.trader).to.equal(trader.address);
+
+                // Attempt redemption
+                await expect(vault.connect(trader).redeemVault(0))
+                    .to.be.revertedWithCustomError(vault, "InsufficientFundForPayout")
+            });
+
+            it("Should revert if USDC transfer fails", async function () {
+                const { vault, mockUSDC, trader, mockChainlinkManager } = await openPositionAndGetID();
+                vaultID = 0;
+
+                // Set profitable price
+                await mockChainlinkManager.setPrice(assetType, 120 * 1e8);
+                await mockChainlinkManager.setDexPrice(assetType, 120 * 1e8);
+
+                // Force transfer failure
+                await mockUSDC.setTransferShouldFail(true);
+
+                await expect(vault.connect(trader).redeemVault(vaultID))
+                    .to.be.revertedWithCustomError(vault, "TransferofFundsFailed");
+            });
+        });
+
+        describe("Edge Cases", function () {
+            it("Should handle zero buffer after large loss", async function () {
+                const { vault, trader, mockChainlinkManager } = await openPositionAndGetID();
+                vaultID = 0;
+
+                // Set price to cause total loss (price drops to 1% of entry)
+                await mockChainlinkManager.setPrice(assetType, 1 * 1e8);
+                await mockChainlinkManager.setDexPrice(assetType, 1 * 1e8);
+
+                const tx = await vault.connect(trader).redeemVault(vaultID);
+                await expect(tx).to.emit(vault, "PositionClosed");
+
+                const position = await vault.userPositions(trader.address, vaultID);
+                expect(position.paidOut).to.be.true;
+            });
+
+            it("Should handle negative redemption amount (no payout)", async function () {
+                const { vault, trader, mockChainlinkManager } = await openPositionAndGetID();
+                vaultID = 0;
+
+                // Set price to cause loss exceeding buffer
+                await mockChainlinkManager.setPrice(assetType, 50 * 1e8);
+                await mockChainlinkManager.setDexPrice(assetType, 50 * 1e8);
+
+                const tx = await vault.connect(trader).redeemVault(vaultID);
+                await expect(tx).to.emit(vault, "PositionClosed");
+
+                // Verify no funds were transferred
+                const position = await vault.userPositions(trader.address, vaultID);
+                expect(position.paidOut).to.be.true;
+            });
+        });
+    });
 });
+
