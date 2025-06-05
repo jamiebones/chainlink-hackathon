@@ -52,6 +52,8 @@ contract Vault is ReentrancyGuard {
     error InvalidPrice();
     error TransferofFundsFailed();
     error InsufficientFundForPayout();
+    error InvalidVaultID();
+    error VaultAlreadyPaidOut();
 
     //pause protocol
 
@@ -74,11 +76,14 @@ contract Vault is ReentrancyGuard {
     event PositionClosed(
         address indexed trader,
         uint256 indexed positionId,
-        Utils.Asset assetType,
         uint256 mintedAmount,
+        uint256 amountRefunded,
+        uint256 redemtionFee,
         uint256 bufferCollateral,
         uint256 hedgedCollateral,
-        uint256 entryPrice
+        uint256 entryPrice,
+        uint256 date,
+        Utils.Asset assetType
     );
 
     constructor(address _usdc, address _admin, address _chainlinkManager) {
@@ -229,7 +234,6 @@ contract Vault is ReentrancyGuard {
         if (usdcContract.balanceOf(address(this)) < amountToPayInUSDC) {
             revert InsufficientFundForPayout();
         }
-
         //burn the token:
         assetContract.burn(msg.sender, stockToRedeem);
         //the redemption fee goes to the liquidity pool: Need to add
@@ -243,6 +247,97 @@ contract Vault is ReentrancyGuard {
         if (!success || (data.length != 0 && !abi.decode(data, (bool)))) {
             revert TransferofFundsFailed();
         }
+
+        //finally reduced the hedge collateral balance of the contract
+        totalHedgedCollateralBalance =
+            totalHedgedCollateralBalance -
+            stockToRedeem;
+    }
+
+    function redeemVault(uint256 vaultID) external {
+        //check if the vault is present and has not been redeemed already
+        if (!isStarted) revert NotStarted();
+        if (isPaused) revert Paused();
+        SyntheticSlot memory vault = userPositions[msg.sender][vaultID];
+        if (vault.trader == address(0)) {
+            revert InvalidVaultID();
+        }
+
+        if (vault.paidOut == true) {
+            revert VaultAlreadyPaidOut();
+        }
+        //calculate the curent price of the stock
+        uint256 currentChainlinkAssetPrice = getScaledChainlinkPrice(
+            vault.assetType
+        );
+        uint256 currentDexAssetPrice = getScaledDexPrice(vault.assetType);
+        uint256 redemptionPercentage = _calculateRedeemFee(
+            currentChainlinkAssetPrice,
+            currentDexAssetPrice
+        );
+        //check the price of the stock if it has gained pnl
+        int256 pnl;
+        uint256 entryPrice = vault.entryPrice;
+        if (entryPrice > currentChainlinkAssetPrice) {
+            //we made a loss
+            pnl = int256(entryPrice) - int256(currentChainlinkAssetPrice);
+        } else {
+            //we made profit here:
+            pnl = int256(currentChainlinkAssetPrice) - int256(entryPrice);
+        }
+        //get the total loss or profit per share boughtt
+        int256 totalPnl = (pnl * int256(vault.mintedAmount)) /
+            int256(PRECISION);
+
+        int256 totalLeftToRedeem = int256(vault.bufferCollateral) + totalPnl;
+        uint256 balanceinUSDC;
+        uint256 redemtionFee;
+        if (totalLeftToRedeem > 0) {
+            //we have something left to collect back from the vault;
+            redemtionFee =
+                (uint256(totalLeftToRedeem) * redemptionPercentage) /
+                PRECISION;
+            uint256 balanceToRedeem = uint256(totalLeftToRedeem) - redemtionFee;
+            balanceinUSDC = convert18ToUSDCDecimal(balanceToRedeem);
+
+            if (usdcContract.balanceOf(address(this)) < balanceinUSDC) {
+                revert InsufficientFundForPayout();
+            }
+
+            //redemtion fee goes to Liquidity pool
+            (bool success, bytes memory data) = address(usdcContract).call(
+                abi.encodeWithSelector(
+                    usdcContract.transfer.selector,
+                    msg.sender,
+                    balanceinUSDC
+                )
+            );
+            if (!success || (data.length != 0 && !abi.decode(data, (bool)))) {
+                revert TransferofFundsFailed();
+            }
+        }
+
+        //close the position and other clean ups:
+        userPositions[msg.sender][vaultID].paidOut = true;
+        userPositions[msg.sender][vaultID].isActive = false;
+
+        //reduce the buffercollacteral total variable in the system:
+        totalBufferCollateralBalance =
+            totalBufferCollateralBalance -
+            vault.bufferCollateral;
+
+        emit PositionClosed({
+            trader: msg.sender,
+            positionId: vault.positionIndex,
+            assetType: vault.assetType,
+            mintedAmount: vault.mintedAmount,
+            redemtionFee: redemtionFee,
+            amountRefunded: balanceinUSDC,
+            hedgedCollateral: vault.hedgedCollateral,
+            bufferCollateral: vault.bufferCollateral,
+            entryPrice: vault.entryPrice,
+            date: block.timestamp
+        });
     }
 
     function pause() external onlyAdmin {
@@ -331,7 +426,6 @@ contract Vault is ReentrancyGuard {
         return value18 / 1e12;
     }
 
-    function redeemVault() external {}
 
     function _calculateRedeemFee(
         uint256 dexPrice,
