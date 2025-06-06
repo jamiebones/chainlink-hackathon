@@ -5,8 +5,11 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { LiquidityPool } from "./LiquidityPool.sol";
 import { ChainlinkManager } from "./ChainlinkManager.sol";
 import { Utils } from "../lib/Utils.sol";
+import { FixedPointMathLib } from "solmate/src/utils/FixedPointMathLib.sol";
 
 contract PerpMarket {
+    using FixedPointMathLib for uint256;
+
     error OnlyVault();
     error AlreadyOpen();
     error ZeroCollateral();
@@ -83,7 +86,7 @@ contract PerpMarket {
         uint256 reserved = pool.reservedLiquidity();
         if (total == 0) revert EmptyPool();
 
-        uint256 newUtil = ((reserved + newSizeUsd) * 10000) / total;
+        uint256 newUtil = (reserved + newSizeUsd).mulDivDown(10000, total);
         if (newUtil > maxUtilizationBps) revert ExceedsUtilization();
     }
 
@@ -93,7 +96,7 @@ contract PerpMarket {
         if (leverage < 1e6 || leverage > 10e6) revert InvalidLeverage();
 
         uint256 price = getPrice();
-        uint256 sizeUsd = (collateralAmount * leverage) / 1e6;
+        uint256 sizeUsd = collateralAmount.mulDivDown(leverage, 1e6);
         _validateUtilization(sizeUsd);
 
         collateralToken.transferFrom(msg.sender, address(pool), collateralAmount);
@@ -139,11 +142,12 @@ contract PerpMarket {
 
         uint256 price = getPrice();
         uint256 sizeClosed = reduceSizeUsd;
-        uint256 collateralPortion = (p.collateral * sizeClosed) / p.sizeUsd;
+        uint256 collateralPortion = p.collateral.mulDivDown(sizeClosed, p.sizeUsd);
 
+        uint256 priceRatio = price.mulDivDown(1e18, p.entryPrice);
         int256 pnl = p.isLong
-            ? int256(sizeClosed * price / p.entryPrice) - int256(sizeClosed)
-            : int256(sizeClosed) - int256(sizeClosed * price / p.entryPrice);
+            ? int256(sizeClosed.mulDivDown(priceRatio, 1e18)) - int256(sizeClosed)
+            : int256(sizeClosed) - int256(sizeClosed.mulDivDown(priceRatio, 1e18));
 
         int256 returned = int256(collateralPortion) + pnl;
         if (returned <= 0) revert LossExceeded();
@@ -168,9 +172,10 @@ contract PerpMarket {
         _applyFunding(positions[msg.sender]);
 
         uint256 price = getPrice();
+        uint256 priceRatio = price.mulDivDown(1e18, p.entryPrice);
         int256 pnl = p.isLong
-            ? int256(p.sizeUsd * price / p.entryPrice) - int256(p.sizeUsd)
-            : int256(p.sizeUsd) - int256(p.sizeUsd * price / p.entryPrice);
+            ? int256(p.sizeUsd.mulDivDown(priceRatio, 1e18)) - int256(p.sizeUsd)
+            : int256(p.sizeUsd) - int256(p.sizeUsd.mulDivDown(priceRatio, 1e18));
 
         int256 finalCollateral = int256(p.collateral) + pnl;
         if (finalCollateral <= 0) revert LossExceeded();
@@ -186,9 +191,10 @@ contract PerpMarket {
         if (p.sizeUsd == 0) return 0;
 
         uint256 price = getPrice();
+        uint256 priceRatio = price.mulDivDown(1e18, p.entryPrice);
         return p.isLong
-            ? int256((p.sizeUsd * price / p.entryPrice)) - int256(p.sizeUsd)
-            : int256(p.sizeUsd) - int256((p.sizeUsd * price / p.entryPrice));
+            ? int256(p.sizeUsd.mulDivDown(priceRatio, 1e18)) - int256(p.sizeUsd)
+            : int256(p.sizeUsd) - int256(p.sizeUsd.mulDivDown(priceRatio, 1e18));
     }
 
     function isLiquidatable(address user) public view returns (bool) {
@@ -196,14 +202,15 @@ contract PerpMarket {
         if (p.sizeUsd == 0) return false;
 
         uint256 price = getPrice();
+        uint256 priceRatio = price.mulDivDown(1e18, p.entryPrice);
         int256 pnl = p.isLong
-            ? int256(p.sizeUsd * price / p.entryPrice) - int256(p.sizeUsd)
-            : int256(p.sizeUsd) - int256(p.sizeUsd * price / p.entryPrice);
+            ? int256(p.sizeUsd.mulDivDown(priceRatio, 1e18)) - int256(p.sizeUsd)
+            : int256(p.sizeUsd) - int256(p.sizeUsd.mulDivDown(priceRatio, 1e18));
 
         int256 finalCollateral = int256(p.collateral) + pnl;
         if (finalCollateral <= 0) return true;
 
-        uint256 ratio = uint256(finalCollateral) * 1e6 * 10000 / p.sizeUsd;
+        uint256 ratio = uint256(finalCollateral).mulDivDown(1e6 * 10000, p.sizeUsd);
         return ratio < minCollateralRatioBps;
     }
 
@@ -213,7 +220,7 @@ contract PerpMarket {
         Position memory p = positions[user];
         delete positions[user];
 
-        uint256 penalty = (p.collateral * 5) / 100;
+        uint256 penalty = p.collateral.mulDivDown(5, 100);
         pool.releaseTo(msg.sender, penalty);
         pool.releaseTo(address(pool), p.collateral - penalty);
 
