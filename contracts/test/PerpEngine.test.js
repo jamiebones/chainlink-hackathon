@@ -329,4 +329,40 @@ describe("PerpMarket", function () {
       expect(pos.sizeUsd).to.equal(0);
     });
   });
+
+  describe("allow repeated vault mints by increasing 1x hedge position" , function () {
+    it("should open and increase 1x vault hedge positions correctly", async () => {
+      const amount1 = ethers.parseUnits("300", 6); // 300 USDC
+      const amount2 = ethers.parseUnits("200", 6); // additional 200 USDC
+
+      // Setup vault with USDC
+      await usdc.mint(vault.address, amount1 + amount2);
+      await usdc.connect(vault).approve(market.target, amount1 + amount2);
+
+      // Set initial price
+      await oracle.setPrice(Utils.Asset.TSLA, ethers.parseUnits("100", 8));
+
+      // First hedge - should open a new position
+      await market.connect(vault).openVaultHedge(amount1);
+
+      let pos = await market.positions(vault.address);
+      expect(pos.collateral).to.equal(amount1);
+      expect(pos.sizeUsd).to.equal(amount1);
+      expect(pos.isLong).to.be.true;
+
+      // Update price for next entry
+      await oracle.setPrice(Utils.Asset.TSLA, ethers.parseUnits("110", 8));
+
+      // Second hedge - should increase position
+      await market.connect(vault).openVaultHedge(amount2);
+
+      const totalCollateral = amount1 + amount2;
+      pos = await market.positions(vault.address);
+
+      // Weighted average price: (100*300 + 110*200) / 500 = 104
+      expect(pos.collateral).to.closeTo(totalCollateral, 1e3);
+      expect(pos.sizeUsd).to.equal(totalCollateral);
+      expect(pos.entryPrice).to.closeTo(ethers.parseUnits("104", 8), 1e3);
+    });
+  })
 });

@@ -182,28 +182,47 @@ contract PerpMarket is Ownable {
         emit PositionOpened(msg.sender, sizeUsd, collateralAmount, price, isLong);
     }
 
-    /// @notice Vault-only function to open a 1x long hedge for synthetic minting
+    /// @notice Vault-only function to open or increase a 1x long hedge for synthetic minting
     function openVaultHedge(uint256 collateralAmount) external onlyVault {
         updateFundingRate();
+        require(collateralAmount > 0, "Zero amount");
 
-        if (positions[msg.sender].sizeUsd > 0) revert AlreadyOpen();
+        Position storage p = positions[msg.sender];
 
         uint256 price = getPrice();
-        _validateUtilization(collateralAmount);
+        uint256 sizeUsd = collateralAmount; // 1x leverage => size = collateral
 
+        _validateUtilization(sizeUsd);
+
+        // Transfer USDC from vault to pool
         collateralToken.transferFrom(msg.sender, address(pool), collateralAmount);
-        pool.reserve(collateralAmount);
+        pool.reserve(sizeUsd);
 
-        positions[msg.sender] = Position({
-            sizeUsd: collateralAmount,
-            entryPrice: price,
-            collateral: collateralAmount,
-            isLong: true,
-            entryFundingRate: cumulativeFundingRate
-        });
+        if (p.sizeUsd == 0) {
+            // --- Open new hedge position ---
+            positions[msg.sender] = Position({
+                sizeUsd: sizeUsd,
+                entryPrice: price,
+                collateral: collateralAmount,
+                isLong: true,
+                entryFundingRate: cumulativeFundingRate
+            });
 
-        emit PositionOpened(msg.sender, collateralAmount, collateralAmount, price, true);
+            emit PositionOpened(msg.sender, sizeUsd, collateralAmount, price, true);
+        } else {
+            // --- Increase existing hedge position ---
+            _applyFunding(p); // apply funding delta to update collateral and reset funding base
+
+            // Compute new weighted average entry price
+            p.entryPrice = (p.entryPrice * p.sizeUsd + price * sizeUsd) / (p.sizeUsd + sizeUsd);
+            p.sizeUsd += sizeUsd;
+            p.collateral += collateralAmount;
+            p.entryFundingRate = cumulativeFundingRate;
+
+            emit PositionIncreased(msg.sender, p.sizeUsd, p.collateral);
+        }
     }
+
 
     /// @dev Applies funding rate adjustment to the position's collateral
     function _applyFunding(Position storage p) internal {
