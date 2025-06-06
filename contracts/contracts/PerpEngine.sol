@@ -35,16 +35,21 @@ contract PerpMarket is Ownable {
         uint256 entryFundingRate;    // Funding rate at entry, used to compute funding impact
     }
 
+    // --- Fee Parameters (bps-based) ---
+    uint256 public openFeeBps = 10;         // 0.10%
+    uint256 public closeFeeBps = 10;        // 0.10%
+    uint256 public liquidationPenaltyBps = 200; // 2.00%
+
+    uint256 public minCollateralRatioBps = 1000; // 10% minimum collateral ratio (bps)
+    uint256 public fundingRatePerHour = 50;      // 0.5% per hour funding rate (bps)
+    uint256 public maxUtilizationBps = 8000;     // 80% max pool utilization (bps)
+
     // --- State Variables ---
     IERC20 public collateralToken;           // USDC token
     ChainlinkManager public oracle;          // Chainlink oracle manager
     LiquidityPool public pool;               // Liquidity pool providing margin capital
     address public vault;                    // Address allowed to open hedging positions
     Utils.Asset public asset;                // Enum value identifying the synthetic asset (e.g., TSLA)
-
-    uint256 public minCollateralRatioBps = 1000; // 10% minimum collateral ratio (bps)
-    uint256 public fundingRatePerHour = 50;      // 0.5% per hour funding rate (bps)
-    uint256 public maxUtilizationBps = 8000;     // 80% max pool utilization (bps)
 
     uint256 public cumulativeFundingRate;        // Global cumulative funding index
     uint256 public lastFundingUpdate;            // Timestamp of last funding rate update
@@ -73,6 +78,33 @@ contract PerpMarket is Ownable {
         lastFundingUpdate = block.timestamp;
     }
 
+    function setOpenFeeBps(uint256 bps) external onlyOwner {
+        openFeeBps = bps;
+    }
+
+    function setCloseFeeBps(uint256 bps) external onlyOwner {
+        closeFeeBps = bps;
+    }
+
+    function setLiquidationPenaltyBps(uint256 bps) external onlyOwner {
+        liquidationPenaltyBps = bps;
+    }
+
+    /// @notice Admin function to adjust funding rate per hour (bps)
+    function setFundingRatePerHour(uint256 newRate) external onlyOwner {
+        fundingRatePerHour = newRate;
+    }
+
+    /// @notice Admin function to adjust minimum collateral ratio (bps)
+    function setMinCollateralRatioBps(uint256 newRatio) external onlyOwner {
+        minCollateralRatioBps = newRatio;
+    }
+
+    /// @notice Admin function to adjust maximum utilization ratio (bps)
+    function setMaxUtilizationBps(uint256 newRatio) external onlyOwner {
+        maxUtilizationBps = newRatio;
+    }
+
     /// @notice Fetch current Chainlink oracle price for the asset
     function getPrice() public view returns (uint256) {
         uint256 price = oracle.getPrice(asset);
@@ -81,14 +113,30 @@ contract PerpMarket is Ownable {
     }
 
     /// @notice Updates the global cumulative funding rate based on time elapsed
+    /// @dev This is a flat funding model, charging longs and rewarding shorts uniformly over time.
+    /// The funding rate is expressed in basis points (bps) per hour.
+    /// This function should be called before any position activity (open/close/modify).
     function updateFundingRate() public {
+        // Time elapsed since last funding update (in seconds)
         uint256 elapsed = block.timestamp - lastFundingUpdate;
+
+        // Skip update if called within the same block/timestamp
         if (elapsed == 0) return;
 
-        uint256 hourlyRate = fundingRatePerHour * 1e14; // Convert bps to 1e18 format
+        // Convert fundingRatePerHour (in BPS) to 18-decimal format:
+        // Example: 50 bps = 0.5% = 0.005 * 1e18 = 5e15
+        uint256 hourlyRate = fundingRatePerHour * 1e14;
+
+        // Funding increment for elapsed time:
+        // If 3600s (1 hr) => full hourlyRate
+        // If 1800s (30 mins) => 50% of hourlyRate
         uint256 increment = hourlyRate * elapsed / 3600;
 
+        // Accumulate global funding index
+        // This acts as a running total for funding costs
         cumulativeFundingRate += increment;
+
+        // Update timestamp of last funding update
         lastFundingUpdate = block.timestamp;
     }
 
@@ -114,13 +162,19 @@ contract PerpMarket is Ownable {
         uint256 sizeUsd = collateralAmount.mulDivDown(leverage, 1e6);
         _validateUtilization(sizeUsd);
 
-        collateralToken.transferFrom(msg.sender, address(pool), collateralAmount);
+        // --- Calculate & apply open fee (on sizeUsd) ---
+        uint256 openFee = sizeUsd.mulDivDown(openFeeBps, 10000);
+
+        // Transfer total collateral + open fee to pool
+        collateralToken.transferFrom(msg.sender, address(pool), collateralAmount + openFee);
+
+        // Fee goes to pool directly
         pool.reserve(sizeUsd);
 
         positions[msg.sender] = Position({
             sizeUsd: sizeUsd,
             entryPrice: price,
-            collateral: collateralAmount,
+            collateral: collateralAmount, // fee is not counted as user collateral
             isLong: isLong,
             entryFundingRate: cumulativeFundingRate
         });
@@ -170,12 +224,11 @@ contract PerpMarket is Ownable {
     /// @notice Reduce a position partially by size in USD
     function reducePosition(uint256 reduceSizeUsd) external {
         updateFundingRate();
+        _applyFunding(positions[msg.sender]);
 
         Position storage p = positions[msg.sender];
         if (p.sizeUsd == 0) revert NoPosition();
         require(reduceSizeUsd > 0 && reduceSizeUsd <= p.sizeUsd, "Invalid reduce amount");
-
-        _applyFunding(p);
 
         uint256 price = getPrice();
         uint256 sizeClosed = reduceSizeUsd;
@@ -189,10 +242,16 @@ contract PerpMarket is Ownable {
         int256 returned = int256(collateralPortion) + pnl;
         if (returned <= 0) revert LossExceeded();
 
+        // --- Apply close fee on reduced portion ---
+        uint256 closeFee = uint256(returned).mulDivDown(closeFeeBps, 10000);
+        uint256 netReturn = uint256(returned) - closeFee;
+
         p.sizeUsd -= sizeClosed;
         p.collateral -= collateralPortion;
 
-        pool.releaseTo(msg.sender, uint256(returned));
+        // Send fee to pool, rest to trader
+        pool.releaseTo(address(pool), closeFee);
+        pool.releaseTo(msg.sender, netReturn);
 
         emit PositionReduced(msg.sender, sizeClosed, p.sizeUsd, pnl);
 
@@ -205,14 +264,14 @@ contract PerpMarket is Ownable {
     /// @notice Close a position completely and release final collateral
     function closePosition() external {
         updateFundingRate();
+        _applyFunding(positions[msg.sender]);
 
         Position memory p = positions[msg.sender];
         if (p.sizeUsd == 0) revert NoPosition();
 
-        _applyFunding(positions[msg.sender]);
-
         uint256 price = getPrice();
         uint256 priceRatio = price.mulDivDown(1e18, p.entryPrice);
+
         int256 pnl = p.isLong
             ? int256(p.sizeUsd.mulDivDown(priceRatio, 1e18)) - int256(p.sizeUsd)
             : int256(p.sizeUsd) - int256(p.sizeUsd.mulDivDown(priceRatio, 1e18));
@@ -220,8 +279,14 @@ contract PerpMarket is Ownable {
         int256 finalCollateral = int256(p.collateral) + pnl;
         if (finalCollateral <= 0) revert LossExceeded();
 
+        // --- Apply close fee ---
+        uint256 closeFee = uint256(finalCollateral).mulDivDown(closeFeeBps, 10000);
+
         delete positions[msg.sender];
-        pool.releaseTo(msg.sender, uint256(finalCollateral));
+
+        // Send fee to pool, remainder to trader
+        pool.releaseTo(address(pool), closeFee);
+        pool.releaseTo(msg.sender, uint256(finalCollateral) - closeFee);
 
         emit PositionClosed(msg.sender, uint256(finalCollateral), pnl);
     }
@@ -265,15 +330,13 @@ contract PerpMarket is Ownable {
         Position memory p = positions[user];
         delete positions[user];
 
-        uint256 penalty = p.collateral.mulDivDown(5, 100);
+        // Apply liquidation penalty to collateral
+        uint256 penalty = p.collateral.mulDivDown(liquidationPenaltyBps, 10000);
+
+        // Reward liquidator with penalty, send rest to pool
         pool.releaseTo(msg.sender, penalty);
         pool.releaseTo(address(pool), p.collateral - penalty);
 
         emit PositionLiquidated(user, penalty);
-    }
-
-    /// @notice Admin function to adjust funding rate per hour (bps)
-    function setFundingRatePerHour(uint256 newRate) external onlyOwner {
-        fundingRatePerHour = newRate;
     }
 }
