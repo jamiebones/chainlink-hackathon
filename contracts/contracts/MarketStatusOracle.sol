@@ -1,3 +1,4 @@
+//contract address - 0x7C8cb9E7f3Ff6C81169976bF87F761174B298902
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
@@ -31,7 +32,7 @@ contract MarketStatusOracle is FunctionsClient, ConfirmedOwner {
 
     constructor() FunctionsClient(router) ConfirmedOwner(msg.sender) {}
 
-    function sendRequest(uint64 subscriptionId) public onlyOwner returns (bytes32 requestId) {
+    function sendRequest(uint64 subscriptionId) public returns (bytes32 requestId) {
         FunctionsRequest.Request memory req;
         req.initializeRequestForInlineJavaScript(source);
         s_lastRequestId = _sendRequest(
