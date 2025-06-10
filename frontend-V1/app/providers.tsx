@@ -7,47 +7,46 @@ import {
   getDefaultConfig,
 } from '@rainbow-me/rainbowkit';
 import { WagmiProvider } from 'wagmi';
-import { mainnet, sepolia } from 'wagmi/chains';
+import {arbitrum, arbitrumSepolia} from 'wagmi/chains';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
+import { ReactNode } from 'react';
 
-export default function Providers({ children }) {
-  const [config, setConfig] = useState(null);
+export default function Providers({ children }: { children: ReactNode }) {
+  const [config, setConfig] = useState<ReturnType<typeof getDefaultConfig> | null>(null);
   const [queryClient] = useState(() => new QueryClient());
 
   useEffect(() => {
     const config = getDefaultConfig({
       appName: 'sTSLA Hackathon App',
       projectId: 'e872ba5075a2eb7e208dcaeb0bd70e37',
-      chains: [mainnet, sepolia],
-      ssr: false, // 💡 Prevents indexedDB SSR error
+      chains: [arbitrum, arbitrumSepolia],
+      ssr: false,
     });
     setConfig(config);
   }, []);
 
-  if (!config) return null; // Wait until client-only config is ready
+  if (!config) return null;
 
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider>
-          <div
-            style={{
-              width: '100%',
-              display: 'flex',
-              justifyContent: 'space-between',
-              padding: '20px 40px',
-              backgroundColor: '#1a1a1a',
-              borderBottom: '1px solid #333',
-              gap: '20px',
-            }}
-          >
-            <h1 style={{ fontSize: '20px', fontWeight: 600, color: '#FFD700' }}>
-              sTSLA Dashboard
-            </h1>
-            <ConnectButton />
-          </div>
-          {children}
+          <header className="w-full sticky top-0 z-50 bg-[#181A20] border-b border-white/10 shadow-sm">
+            <div className="max-w-7xl mx-auto flex justify-between items-center px-6 py-4">
+              <div className="flex items-center gap-10">
+                <h1 className="text-2xl font-bold text-white tracking-tight">sTSLA Dashboard</h1>
+                <nav className="flex gap-6">
+                  <a href="#" className="text-white/80 hover:text-white px-3 py-2 rounded transition-colors font-medium">Trade</a>
+                  <a href="#" className="text-white/80 hover:text-white px-3 py-2 rounded transition-colors font-medium">Portfolio</a>
+                </nav>
+              </div>
+              <ConnectButton />
+            </div>
+          </header>
+          <main className="bg-[#18181B] min-h-screen pt-4">
+            {children}
+          </main>
         </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>

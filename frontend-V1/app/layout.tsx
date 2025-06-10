@@ -2,7 +2,9 @@ import Providers from "./providers";
 import './globals.css' // MUST be imported at the top
 
 
-export default function RootLayout({ children }) {
+import { ReactNode } from "react";
+
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body>
