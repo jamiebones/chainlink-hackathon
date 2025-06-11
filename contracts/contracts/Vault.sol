@@ -6,20 +6,23 @@ import {Utils} from "../lib/Utils.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IAsset} from "../interfaces/IAsset.sol";
+import {LiquidityPool} from "./LiquidityPool.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 contract Vault is ReentrancyGuard {
     address public admin;
-    uint256 public totalBufferCollateralBalance;
-    uint256 public totalHedgedCollateralBalance;
+    // uint256 public totalBufferCollateralBalance;
+    // uint256 public totalHedgedCollateralBalance;
     uint256 public constant PRECISION = 1e18; //18 decimals
     uint256 public constant USDC_PRECISION = 1e6; //6 decimals
     uint256 public constant CHAINLINK_PRECISION = 1e8; //8 decimals
     uint256 public constant PERCENTAGE_COLLATERAL = 110 * 1e16; //18 decimals
-    bool public isPaused;
+
+
     bool public isStarted;
 
     ChainlinkManager public chainlinkManager;
+    LiquidityPool public liquidityPool;
     IERC20 private usdcContract;
     IAsset private sTSLA;
     IAsset private sAPPL;
@@ -42,6 +45,12 @@ contract Vault is ReentrancyGuard {
     mapping(address => mapping(uint256 => SyntheticSlot)) public userPositions;
     mapping(address => uint256) public userPositionCount;
 
+   
+    mapping(Utils.Asset => uint256) public totalUserBufferUSDC; //tracks the total buffer collateral for each asset type
+    mapping(Utils.Asset => uint256) public globalBufferUSDC; //tracks the total USDC buffer held by protocol (10% from every user)
+    mapping(Utils.Asset => uint256) public totalVaultDebt; //Total sTSLA minted by all users (denotes protocol’s synthetic liability)
+    //mapping => address => utils.Asset => uint256
+
     //errors
     error NotAdmin();
     error InsufficientTokenAmountSpecified();
@@ -54,6 +63,9 @@ contract Vault is ReentrancyGuard {
     error InsufficientFundForPayout();
     error InvalidVaultID();
     error VaultAlreadyPaidOut();
+    error MarketNotOpen();
+    error CircuitBreakerActivatedForAsset(Utils.Asset);
+    error StocksToReddemLowerThanUserBalance();
 
     //pause protocol
 
@@ -86,8 +98,9 @@ contract Vault is ReentrancyGuard {
         Utils.Asset assetType
     );
 
-    constructor(address _usdc, address _admin, address _chainlinkManager) {
+    constructor(address _usdc, address _admin, address _chainlinkManager, address _liquidityPool) {
         chainlinkManager = ChainlinkManager(_chainlinkManager);
+        liquidityPool = LiquidityPool(_liquidityPool);
         usdcContract = IERC20(_usdc);
         admin = _admin;
     }
@@ -107,20 +120,15 @@ contract Vault is ReentrancyGuard {
         uint256 numofShares
     ) external nonReentrant {
         //numofShares comes from the frontend as 18 decimals
-        if (!isStarted) revert NotStarted();
-        if (isPaused) revert Paused();
-
-        if (assetType != Utils.Asset.TSLA && assetType != Utils.Asset.APPL) {
-            revert InvalidAssetTypeUsed();
-        }
+       _checkPriceAndMarketStatus(assetType);
 
         // Initialize assetContract safely
         IAsset assetContract = assetType == Utils.Asset.TSLA ? sTSLA : sAPPL;
 
         uint256 chainLinkEntryPrice = getScaledChainlinkPrice(assetType);
-        uint256 dexEntryPrice = getScaledDexPrice(assetType);
+        uint256 twapPrice = getScaledTwapPrice(assetType);
         uint256 mintFeePercentage = _calculateMintFee(
-            dexEntryPrice,
+            twapPrice,
             chainLinkEntryPrice
         );
 
@@ -131,20 +139,23 @@ contract Vault is ReentrancyGuard {
         uint256 mintFee = (mintFeePercentage * collacteralForSharesInUSD) /
             PRECISION;
 
-        uint256 totalcollacteralINUSD = mintFee + collacteralForSharesInUSD;
         uint256 totalCollacteralInUSDCToPay = convert18ToUSDCDecimal(
-            totalcollacteralINUSD
+            collacteralForSharesInUSD
         );
 
-        uint256 bufferCollacteral = totalcollacteralINUSD / 10;
-        uint256 hedgeCollacteral = totalcollacteralINUSD -
-            (totalcollacteralINUSD / 10);
+        uint256 bufferCollacteral = totalCollacteralInUSDCToPay / 10;
+        uint256 hedgeCollacteral = totalCollacteralInUSDCToPay - bufferCollacteral;
+        uint256 totalCollacteralInUSDCToPayPlusMintFee = convert18ToUSDCDecimal(
+            collacteralForSharesInUSD +
+            mintFee
+        );
 
-        //increment the hedge and buffer balances
-        totalBufferCollateralBalance += totalcollacteralINUSD / 10;
-        totalHedgedCollateralBalance += hedgeCollacteral;
+        //increment user buffer collateral and vault debt
+        totalUserBufferUSDC[assetType] += bufferCollacteral;
+        totalVaultDebt[assetType] += hedgeCollacteral;
+        globalBufferUSDC[assetType] += bufferCollacteral;
+
         //build and save the new vault
-
         uint256 newIndex = userPositionCount[msg.sender];
 
         SyntheticSlot memory newVault = SyntheticSlot({
@@ -178,9 +189,10 @@ contract Vault is ReentrancyGuard {
         }
         //collect the money
         //revert if the collection of the money was not succesful
-        if (!success) revert TransferofFundsFailed();
+        
 
-        //deposit the money in the in house pool
+        //deposit the money in the in house pool => to be implemented 
+        //hedgeCollateral gets deposisted to the in house perps protocol
         //usdcContract.transfer(hedgeCollacteral, address(0)) //sample deposit to the inhouse perps protocol
         emit PositionCreated({
             trader: msg.sender,
@@ -200,131 +212,104 @@ contract Vault is ReentrancyGuard {
     ) external nonReentrant {
         //check if their balance is greater than the stockToRedeem
         if (!isStarted) revert NotStarted();
-        if (isPaused) revert Paused();
+        
+        _checkPriceAndMarketStatus(assetType);
 
-        if (assetType != Utils.Asset.TSLA && assetType != Utils.Asset.APPL) {
-            revert InvalidAssetTypeUsed();
-        }
-
-        if (stockToRedeem == 0) revert InsufficientTokenAmountSpecified();
-
-        // Initialize assetContract safely
-        IAsset assetContract = assetType == Utils.Asset.TSLA ? sTSLA : sAPPL;
-        uint256 traderBalance = assetContract.balanceOf(msg.sender);
-        if (traderBalance < stockToRedeem) {
-            revert InsufficientTokenAmountSpecified();
-        }
+        uint256 amountOfSharesInUSDC = _calculateUserAssetRedemption(assetType, stockToRedeem);
 
         uint256 currentChainlinkAssetPrice = getScaledChainlinkPrice(assetType);
-        uint256 currentDexAssetPrice = getScaledDexPrice(assetType);
-
-        uint256 totalAmount = (currentChainlinkAssetPrice * stockToRedeem) /
-            PRECISION;
-
+        uint256 currentDexAssetPrice = getScaledTwapPrice(assetType);
         uint256 redemptionPercentage = _calculateRedeemFee(
             currentChainlinkAssetPrice,
             currentDexAssetPrice
         );
 
-        uint256 amountToPay = totalAmount -
-            ((totalAmount * redemptionPercentage) / PRECISION);
+        uint256 redemptionFee = (amountOfSharesInUSDC * redemptionPercentage) /
+            PRECISION;
 
-        uint256 amountToPayInUSDC = convert18ToUSDCDecimal(amountToPay);
+        uint256 amountToPayUser = amountOfSharesInUSDC - redemptionFee;
         //check if ths contract has this fee
-        if (usdcContract.balanceOf(address(this)) < amountToPayInUSDC) {
+        if (usdcContract.balanceOf(address(this)) < amountOfSharesInUSDC + redemptionFee) {
             revert InsufficientFundForPayout();
         }
-        //burn the token:
-        assetContract.burn(msg.sender, stockToRedeem);
+       
         //the redemption fee goes to the liquidity pool: Need to add
         (bool success, bytes memory data) = address(usdcContract).call(
             abi.encodeWithSelector(
                 usdcContract.transfer.selector,
                 msg.sender,
-                amountToPayInUSDC
+                amountToPayUser
             )
         );
         if (!success || (data.length != 0 && !abi.decode(data, (bool)))) {
             revert TransferofFundsFailed();
         }
 
-        //finally reduced the hedge collateral balance of the contract
-        totalHedgedCollateralBalance =
-            totalHedgedCollateralBalance -
-            stockToRedeem;
+        liquidityPool.deposit(redemptionFee);
+
+        //close the position here by calling the Perps Engine contract
+
+        
+        
     }
 
-    function redeemVault(uint256 vaultID) external {
+ 
+
+    function redeemVault(uint256 vaultID, uint256 portionToRedeem) external {
         //check if the vault is present and has not been redeemed already
         if (!isStarted) revert NotStarted();
-        if (isPaused) revert Paused();
-        SyntheticSlot memory vault = userPositions[msg.sender][vaultID];
+        require(vaultID < userPositionCount[msg.sender], "Invalid vault ID");
+        
+        if (portionToRedeem == 0) revert InsufficientTokenAmountSpecified();
+        
+        SyntheticSlot storage vault = userPositions[msg.sender][vaultID];
         if (vault.trader == address(0)) {
             revert InvalidVaultID();
         }
-
-        if (vault.paidOut == true) {
+        if (vault.mintedAmount == 0 ){
             revert VaultAlreadyPaidOut();
         }
+        if (vault.paidOut) {
+            revert VaultAlreadyPaidOut();
+        }
+        require(portionToRedeem <= vault.mintedAmount, "Redeem amount exceeds minted amount");
+        uint256 userShareBuffer = _processAssetBufferPayment(vault, portionToRedeem);
+        uint256 userAssetRedemption = _calculateUserAssetRedemption(
+            userPositions[msg.sender][vaultID].assetType,
+            portionToRedeem
+        );
         //calculate the curent price of the stock
         uint256 currentChainlinkAssetPrice = getScaledChainlinkPrice(
             vault.assetType
         );
-        uint256 currentDexAssetPrice = getScaledDexPrice(vault.assetType);
+        uint256 currentDexAssetPrice = getScaledTwapPrice(vault.assetType);
         uint256 redemptionPercentage = _calculateRedeemFee(
             currentChainlinkAssetPrice,
             currentDexAssetPrice
         );
-        //check the price of the stock if it has gained pnl
-        int256 pnl;
-        uint256 entryPrice = vault.entryPrice;
-        if (entryPrice > currentChainlinkAssetPrice) {
-            //we made a loss
-            pnl = int256(entryPrice) - int256(currentChainlinkAssetPrice);
-        } else {
-            //we made profit here:
-            pnl = int256(currentChainlinkAssetPrice) - int256(entryPrice);
-        }
-        //get the total loss or profit per share boughtt
-        int256 totalPnl = (pnl * int256(vault.mintedAmount)) /
-            int256(PRECISION);
 
-        int256 totalLeftToRedeem = int256(vault.bufferCollateral) + totalPnl;
-        uint256 balanceinUSDC;
-        uint256 redemtionFee;
-        if (totalLeftToRedeem > 0) {
-            //we have something left to collect back from the vault;
-            redemtionFee =
-                (uint256(totalLeftToRedeem) * redemptionPercentage) /
-                PRECISION;
-            uint256 balanceToRedeem = uint256(totalLeftToRedeem) - redemtionFee;
-            balanceinUSDC = convert18ToUSDCDecimal(balanceToRedeem);
+        uint256 redemtionFee = ((userAssetRedemption + userShareBuffer) * redemptionPercentage) /
+            PRECISION;
 
-            if (usdcContract.balanceOf(address(this)) < balanceinUSDC) {
-                revert InsufficientFundForPayout();
-            }
+        uint256 amountToPayUser = userAssetRedemption + userShareBuffer - redemtionFee;
 
-            //redemtion fee goes to Liquidity pool
-            (bool success, bytes memory data) = address(usdcContract).call(
-                abi.encodeWithSelector(
-                    usdcContract.transfer.selector,
-                    msg.sender,
-                    balanceinUSDC
-                )
-            );
-            if (!success || (data.length != 0 && !abi.decode(data, (bool)))) {
-                revert TransferofFundsFailed();
-            }
+
+        //close the position
+
+
+        //transfer the fee to the user 
+
+        (bool success, bytes memory data) = address(usdcContract).call(
+            abi.encodeWithSelector(
+                usdcContract.transfer.selector,
+                msg.sender,
+                amountToPayUser
+            )
+        );
+        if (!success || (data.length != 0 && !abi.decode(data, (bool)))) {
+            revert TransferofFundsFailed();
         }
 
-        //close the position and other clean ups:
-        userPositions[msg.sender][vaultID].paidOut = true;
-        userPositions[msg.sender][vaultID].isActive = false;
-
-        //reduce the buffercollacteral total variable in the system:
-        totalBufferCollateralBalance =
-            totalBufferCollateralBalance -
-            vault.bufferCollateral;
 
         emit PositionClosed({
             trader: msg.sender,
@@ -332,7 +317,7 @@ contract Vault is ReentrancyGuard {
             assetType: vault.assetType,
             mintedAmount: vault.mintedAmount,
             redemtionFee: redemtionFee,
-            amountRefunded: balanceinUSDC,
+            amountRefunded: amountToPayUser,
             hedgedCollateral: vault.hedgedCollateral,
             bufferCollateral: vault.bufferCollateral,
             entryPrice: vault.entryPrice,
@@ -340,13 +325,7 @@ contract Vault is ReentrancyGuard {
         });
     }
 
-    function pause() external onlyAdmin {
-        isPaused = true;
-    }
-
-    function unpause() external onlyAdmin {
-        isPaused = false;
-    }
+ 
 
     function _calculateMintFee(
         uint256 dexPrice,
@@ -409,13 +388,13 @@ contract Vault is ReentrancyGuard {
         return uint256(price) * (PRECISION / CHAINLINK_PRECISION);
     }
 
-    function getScaledDexPrice(
+    function getScaledTwapPrice(
         Utils.Asset asset
     ) public view returns (uint256) {
         if (asset != Utils.Asset.TSLA && asset != Utils.Asset.APPL) {
             revert InvalidAssetTypeUsed();
         }
-        uint256 price = chainlinkManager.getDexPriceofAsset(asset);
+        uint256 price = chainlinkManager.getTwapPriceofAsset(asset);
         require(price > 0, "Invalid price");
         return uint256(price) * (PRECISION / CHAINLINK_PRECISION);
     }
@@ -475,5 +454,90 @@ contract Vault is ReentrancyGuard {
         IERC20 tokenContract = IERC20(token);
         uint256 balance = tokenContract.balanceOf(address(this));
         tokenContract.transfer(admin, balance);
+    }
+
+    function _checkPriceAndMarketStatus(Utils.Asset assetType) private view returns (bool) {
+        if (!isStarted) revert NotStarted();
+        
+        if (assetType != Utils.Asset.TSLA && assetType != Utils.Asset.APPL) {
+            revert InvalidAssetTypeUsed();
+        }
+
+        if (!chainlinkManager.isMarketOpen()){
+            revert MarketNotOpen();
+        }
+
+        if (chainlinkManager.checkIfAssetIsPaused(assetType)){
+            revert CircuitBreakerActivatedForAsset(assetType);
+        }
+        return true;
+    }
+
+    
+
+    function _processAssetBufferPayment( SyntheticSlot storage vault, uint256 tokenToRedeem) private returns (uint256){
+           //get the vault;
+      
+        //check the assetType of the asset;
+        IAsset assetContract = vault.assetType == Utils.Asset.TSLA ? sTSLA : sAPPL;
+        //get the balance of the synthetic asset owned by the user;
+        uint256 traderBalanceofAsset = assetContract.balanceOf(msg.sender);
+        if (traderBalanceofAsset < tokenToRedeem) {
+            revert InsufficientTokenAmountSpecified();
+        }
+
+        require(tokenToRedeem > 0 && tokenToRedeem <= vault.mintedAmount, "Invalid amount");
+        uint256 redeemPortion = (tokenToRedeem  * PRECISION) / vault.mintedAmount;
+
+        //update the vault here
+        vault.mintedAmount -= tokenToRedeem;
+        uint256 userOriginalBufferShare = vault.bufferCollateral * redeemPortion / PRECISION;
+        require(totalUserBufferUSDC[vault.assetType] > 0, "Division by zero");
+        uint userBuferShare = userOriginalBufferShare * (globalBufferUSDC[vault.assetType] / totalUserBufferUSDC[vault.assetType]);
+
+        vault.bufferCollateral -= userOriginalBufferShare;
+        vault.hedgedCollateral -= (vault.hedgedCollateral * redeemPortion) / PRECISION;
+
+        if (vault.mintedAmount == 0) {
+            vault.paidOut = true;
+            vault.isActive = false;
+        }
+
+        globalBufferUSDC[vault.assetType] -= userBuferShare;
+        totalUserBufferUSDC[vault.assetType] -= userOriginalBufferShare;
+        return userBuferShare;
+    }
+
+    function _calculateUserAssetRedemption(Utils.Asset assetType, uint256 stockToRedeem) private returns (uint256){
+          if (!isStarted) revert NotStarted();
+        
+        _checkPriceAndMarketStatus(assetType);
+
+        if (stockToRedeem == 0) revert InsufficientTokenAmountSpecified();
+
+        // Initialize assetContract safely
+        IAsset assetContract = assetType == Utils.Asset.TSLA ? sTSLA : sAPPL;
+        uint256 traderBalanceofAsset = assetContract.balanceOf(msg.sender);
+
+        if (traderBalanceofAsset < stockToRedeem) {
+            revert StocksToReddemLowerThanUserBalance();
+        }
+
+        uint256 currentChainlinkAssetPrice = getScaledChainlinkPrice(assetType);
+        uint256 totalAmount = (currentChainlinkAssetPrice * stockToRedeem) / PRECISION;
+        uint256 amountToPayInUSDC = convert18ToUSDCDecimal(totalAmount);
+        //burn the token:
+        assetContract.burn(msg.sender, stockToRedeem);
+        //the redemption fee goes to the liquidity pool: Need to add
+        uint256 shareAmountInUSDC = convert18ToUSDCDecimal(totalAmount);
+
+        //reduce the vault debt here:
+        totalVaultDebt[assetType] -= shareAmountInUSDC;
+        
+        return amountToPayInUSDC;
+        //close the position by calling the Perps Engine contract
+
+        //reduce the totalDebtOfTheContract
+
     }
 }

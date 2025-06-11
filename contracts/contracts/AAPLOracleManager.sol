@@ -1,4 +1,4 @@
-// contract address - 0x9005aa9B6C40369F6486856093C59aA0e8598D88
+//contract address 0xe0eaee40742413A48c1aA43AAF494bBBcCBEa055
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
@@ -6,11 +6,9 @@ import {FunctionsClient} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/Fu
 import {ConfirmedOwner} from "@chainlink/contracts/src/v0.8/shared/access/ConfirmedOwner.sol";
 import {FunctionsRequest} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/libraries/FunctionsRequest.sol";
 
-interface IMarketStatusOracle {
-    function isMarketOpen() external view returns (bool);
-}
 
-contract TSLAOracleManager is FunctionsClient, ConfirmedOwner {
+
+contract AAPLOracleManager is FunctionsClient, ConfirmedOwner {
     using FunctionsRequest for FunctionsRequest.Request;
 
     // Chainlink Functions
@@ -27,41 +25,35 @@ contract TSLAOracleManager is FunctionsClient, ConfirmedOwner {
     uint256 public lastPrice;
     bool public circuitBreakerActive;
 
-    // External MarketStatusOracle
-    IMarketStatusOracle public marketStatusOracle;
+   
 
     // Chainlink config (update for your network as needed)
     address constant router = 0x234a5fb5Bd614a7AA2FfAB244D603abFA0Ac5C5C;
-    bytes32 constant donID =
-        0x66756e2d617262697472756d2d7365706f6c69612d3100000000000000000000;
+    bytes32 constant donID = 0x66756e2d617262697472756d2d7365706f6c69612d3100000000000000000000;
     uint32 constant gasLimit = 300000;
 
     string constant source =
-        'const apiKey = "VQCHMJ6090ZBZRLX";\n'
-        "const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=TSLA&apikey=${apiKey}`;\n"
+        "const apiKey = \"VQCHMJ6090ZBZRLX\";\n"
+        "const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=AAPL&apikey=${apiKey}`;\n"
         "const response = await Functions.makeHttpRequest({ url });\n"
-        'if (response.error) { throw Error("API request failed") }\n'
-        'const data = response.data["Global Quote"];\n'
-        'if (!data || !data["05. price"]) { throw Error("Invalid API response") }\n'
-        'const tslaPrice = parseFloat(data["05. price"]);\n'
-        "return Functions.encodeUint256(Math.round(tslaPrice * 100));";
+        "if (response.error) { throw Error(\"API request failed\") }\n"
+        "const data = response.data[\"Global Quote\"];\n"
+        "if (!data || !data[\"05. price\"]) { throw Error(\"Invalid API response\") }\n"
+        "const aaplPrice = parseFloat(data[\"05. price\"]);\n"
+        "return Functions.encodeUint256(Math.round(aaplPrice * 100));";
 
-    event OracleUpdate(
-        uint256 indexed price,
-        uint256 indexed twap,
-        bool circuitBreaker
-    );
+    event OracleUpdate(uint256 indexed price, uint256 indexed twap, bool circuitBreaker);
 
-    constructor(
-        uint256 _windowSize,
-        address _marketStatusOracle
-    ) FunctionsClient(router) ConfirmedOwner(msg.sender) {
+    constructor(uint256 _windowSize)
+        FunctionsClient(router)
+        ConfirmedOwner(msg.sender)
+    {
         require(_windowSize > 0 && _windowSize < 1000, "Invalid window size");
         windowSize = _windowSize;
         prices = new uint256[](_windowSize);
         pointer = 0;
         priceCount = 0;
-        marketStatusOracle = IMarketStatusOracle(_marketStatusOracle);
+        
     }
 
     // Allows owner to update window size (resets price history)
@@ -129,12 +121,8 @@ contract TSLAOracleManager is FunctionsClient, ConfirmedOwner {
         return circuitBreakerActive;
     }
 
-    // Reads current market status from the MarketStatusOracle contract
-    function isMarketOpen() external view returns (bool) {
-        return marketStatusOracle.isMarketOpen();
-    }
-
-    function getPriceTSLA() external view returns (uint256) {
+   
+    function getPriceAAPL() external view returns (uint256){
         return lastPrice;
     }
 }
