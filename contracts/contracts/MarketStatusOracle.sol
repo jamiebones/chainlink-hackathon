@@ -1,10 +1,10 @@
 //contract address - 0x7C8cb9E7f3Ff6C81169976bF87F761174B298902
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.19;
+pragma solidity ^0.8.28;
 
-import {FunctionsClient} from "@chainlink/contracts@1.4.0/src/v0.8/functions/v1_0_0/FunctionsClient.sol";
-import {ConfirmedOwner} from "@chainlink/contracts@1.4.0/src/v0.8/shared/access/ConfirmedOwner.sol";
-import {FunctionsRequest} from "@chainlink/contracts@1.4.0/src/v0.8/functions/v1_0_0/libraries/FunctionsRequest.sol";
+import {FunctionsClient} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/FunctionsClient.sol";
+import {ConfirmedOwner} from "@chainlink/contracts/src/v0.8/shared/access/ConfirmedOwner.sol";
+import {FunctionsRequest} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/libraries/FunctionsRequest.sol";
 
 contract MarketStatusOracle is FunctionsClient, ConfirmedOwner {
     using FunctionsRequest for FunctionsRequest.Request;
@@ -16,12 +16,13 @@ contract MarketStatusOracle is FunctionsClient, ConfirmedOwner {
     bool public isMarketOpen;
 
     address constant router = 0x234a5fb5Bd614a7AA2FfAB244D603abFA0Ac5C5C;
-    bytes32 constant donID = 0x66756e2d617262697472756d2d7365706f6c69612d3100000000000000000000;
+    bytes32 constant donID =
+        0x66756e2d617262697472756d2d7365706f6c69612d3100000000000000000000;
     uint32 constant gasLimit = 200000;
 
     // Finnhub API key is hardcoded below!
     string constant source =
-        "const apiKey = \"d10lgh1r01qlsac9rn90d10lgh1r01qlsac9rn9g\";\n"
+        'const apiKey = "d10lgh1r01qlsac9rn90d10lgh1r01qlsac9rn9g";\n'
         "const url = `https://finnhub.io/api/v1/stock/market-status?exchange=US&token=${apiKey}`;\n"
         "const response = await Functions.makeHttpRequest({ url });\n"
         "if (!response || response.error) { return Functions.encodeUint256(0); }\n"
@@ -32,7 +33,9 @@ contract MarketStatusOracle is FunctionsClient, ConfirmedOwner {
 
     constructor() FunctionsClient(router) ConfirmedOwner(msg.sender) {}
 
-    function sendRequest(uint64 subscriptionId) public returns (bytes32 requestId) {
+    function sendRequest(
+        uint64 subscriptionId
+    ) public returns (bytes32 requestId) {
         FunctionsRequest.Request memory req;
         req.initializeRequestForInlineJavaScript(source);
         s_lastRequestId = _sendRequest(
