@@ -1,7 +1,8 @@
 {
   "name": "hardhat-project",
   "scripts": {
-    "test": "npx hardhat test"
+    "test": "npx hardhat test",
+    "vault-test": "npx hardhat test test/Vault.test.js"
   },
   "devDependencies": {
     "@chainlink/contracts": "^1.4.0",
