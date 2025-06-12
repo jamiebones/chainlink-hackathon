@@ -799,6 +799,12 @@ contract PerpEngine is Ownable, ReentrancyGuard {
         return uint256(factor) * p.entryPrice / 1e18;
     }
 
+    //added this to be able to call from the vault
+    function addFeesToPool(uint256 feeAmount) external onlyVault {
+        if (feeAmount == 0) revert ZeroAmount();
+        pool.collectFee(feeAmount);
+    }
+
     // --------------------------------------------------------
     // ADMIN CONFIGURATION
     // --------------------------------------------------------
