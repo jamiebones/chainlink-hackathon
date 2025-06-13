@@ -1,38 +1,61 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "hardhat/console.sol";
+import "../../lib/Utils.sol";
 
-enum Asset {
-    TSLA,
-    APPL,
-    GOOGL,
-    MSFT,
-    AMZN
-}
-
-/**
- * @title MockChainlinkManager - Alternative Version
- * @dev Mock that works with Asset enum directly
- */
 contract MockChainlinkManager {
-    mapping(Asset => uint256) public prices;
-    mapping(Asset => uint256) public dexPrices;
+    mapping(Utils.Asset => uint256) private prices;
+    mapping(Utils.Asset => uint256) private dexPrices;
+    mapping(Utils.Asset => bool) private assetPaused;
+    bool private marketOpen;
 
-    function setPrice(Asset asset, uint256 price) public {
-        prices[asset] = price;
+    function setPrice(Utils.Asset assetType, uint256 price) external {
+        require(price > 0, "Price must be greater than 0");
+        prices[assetType] = price;
     }
 
-    function getPrice(Asset asset) external view returns (uint256) {
-        uint256 price = prices[asset];
+    function setDexPrice(Utils.Asset assetType, uint256 price) external {
+        require(price > 0, "Price must be greater than 0");
+        dexPrices[assetType] = price;
+    }
+
+    function setMarketOpen(bool _isOpen) external {
+        marketOpen = _isOpen;
+    }
+
+    function setPaused(Utils.Asset assetType, bool isPaused) external {
+        assetPaused[assetType] = isPaused;
+    }
+
+    function getPrice(Utils.Asset assetType) external view returns (uint256) {
+        uint256 price = prices[assetType];
+        require(price > 0, "Price not set");
         return price;
     }
 
-    function setDexPrice(Asset asset, uint256 price) public {
-        dexPrices[asset] = price;
+    function getDexPrice(
+        Utils.Asset assetType
+    ) external view returns (uint256) {
+        uint256 price = dexPrices[assetType];
+        require(price > 0, "DEX price not set");
+        return price;
     }
 
-    function getDexPrice(Asset asset) external view returns (uint256) {
-        return dexPrices[asset];
+    function getTwapPriceofAsset(
+        Utils.Asset assetType
+    ) external view returns (uint256) {
+        uint256 price = dexPrices[assetType];
+        require(price > 0, "TWAP price not set");
+        return price;
+    }
+
+    function isMarketOpen() external view returns (bool) {
+        return marketOpen;
+    }
+
+    function checkIfAssetIsPaused(
+        Utils.Asset assetType
+    ) external view returns (bool) {
+        return assetPaused[assetType];
     }
 }
