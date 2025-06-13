@@ -11,20 +11,10 @@ const ARBITRUM_RPC_URL = process.env.ARBITRUM_RPC_URL || "https://arb1.arbitrum.
 const ARBITRUM_SEPOLIA_RPC_URL = process.env.ARBITRUM_SEPOLIA_RPC_URL || "https://sepolia-rollup.arbitrum.io/rpc";
 const SEPOLIA_RPC_URL = process.env.SEPOLIA_RPC_URL || "https://eth-sepolia.g.alchemy.com/v2/demo";
 const MAINNET_RPC_URL = process.env.MAINNET_RPC_URL || "https://eth-mainnet.g.alchemy.com/v2/demo";
-const OPTIMISM_RPC_URL = process.env.OPTIMISM_RPC_URL || "https://mainnet.optimism.io";
-const POLYGON_RPC_URL = process.env.POLYGON_RPC_URL || "https://polygon-rpc.com";
-const BASE_RPC_URL = process.env.BASE_RPC_URL || "https://mainnet.base.org";
-const BSC_RPC_URL = process.env.BSC_RPC_URL || "https://bsc-dataseed.binance.org";
-const AVALANCHE_RPC_URL = process.env.AVALANCHE_RPC_URL || "https://api.avax.network/ext/bc/C/rpc";
 
 // API Keys for verification
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || "";
 const ARBISCAN_API_KEY = process.env.ARBISCAN_API_KEY || "";
-const OPTIMISTIC_ETHERSCAN_API_KEY = process.env.OPTIMISTIC_ETHERSCAN_API_KEY || "";
-const POLYGONSCAN_API_KEY = process.env.POLYGONSCAN_API_KEY || "";
-const BASESCAN_API_KEY = process.env.BASESCAN_API_KEY || "";
-const BSCSCAN_API_KEY = process.env.BSCSCAN_API_KEY || "";
-const SNOWTRACE_API_KEY = process.env.SNOWTRACE_API_KEY || "";
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
