@@ -1,6 +1,9 @@
 require("@nomicfoundation/hardhat-toolbox");
+require("dotenv").config();
 
-/** @type import('hardhat/config').HardhatUserConfig */
+// For best security, use environment variables
+const PRIVATE_KEY = process.env.PRIVATE_KEY || "YOUR_PRIVATE_KEY_HERE";
+
 module.exports = {
   solidity: {
     compilers: [
@@ -22,7 +25,14 @@ module.exports = {
             runs: 200,
           },
         },
-      }
+      },
     ],
+  },
+  networks: {
+    fuji: {
+      url: "https://api.avax-test.network/ext/bc/C/rpc",
+      accounts: [PRIVATE_KEY],
+      chainId: 43113,
+    },
   },
 };
