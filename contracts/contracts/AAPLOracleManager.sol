@@ -27,10 +27,14 @@ contract AAPLOracleManager is FunctionsClient, ConfirmedOwner {
 
    
 
-    // Chainlink config (update for your network as needed)
-    address constant router = 0x234a5fb5Bd614a7AA2FfAB244D603abFA0Ac5C5C;
-    bytes32 constant donID = 0x66756e2d617262697472756d2d7365706f6c69612d3100000000000000000000;
-    uint32 constant gasLimit = 300000;
+    // // Chainlink config (update for your network as needed)
+    // address constant router = 0x234a5fb5Bd614a7AA2FfAB244D603abFA0Ac5C5C;
+    // bytes32 constant donID = 0x66756e2d617262697472756d2d7365706f6c69612d3100000000000000000000;
+    // uint32 constant gasLimit = 300000;
+
+    address public immutable router;
+    bytes32 public immutable donID;
+    uint32  public immutable gasLimit;
 
     string constant source =
         "const apiKey = \"VQCHMJ6090ZBZRLX\";\n"
@@ -44,8 +48,8 @@ contract AAPLOracleManager is FunctionsClient, ConfirmedOwner {
 
     event OracleUpdate(uint256 indexed price, uint256 indexed twap, bool circuitBreaker);
 
-    constructor(uint256 _windowSize)
-        FunctionsClient(router)
+    constructor(uint256 _windowSize, address _router, bytes32 _donID, uint32 _gasLimit)
+        FunctionsClient(_router)
         ConfirmedOwner(msg.sender)
     {
         require(_windowSize > 0 && _windowSize < 1000, "Invalid window size");
@@ -53,7 +57,10 @@ contract AAPLOracleManager is FunctionsClient, ConfirmedOwner {
         prices = new uint256[](_windowSize);
         pointer = 0;
         priceCount = 0;
-        
+
+        router = _router;
+        donID = _donID;
+        gasLimit = _gasLimit;
     }
 
     // Allows owner to update window size (resets price history)
