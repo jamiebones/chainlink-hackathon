@@ -58,7 +58,7 @@ describe("PerpEngine - Fixed Test Suite", function () {
     );
     await perpEngine.waitForDeployment();
 
-    // CRITICAL: Set up all permissions and initial state properly
+    // Set up all permissions and initial state properly
     await liquidityPool.setPerpMarket(await perpEngine.getAddress());
     await liquidityPool.setVault(vault.address);
 
@@ -93,7 +93,7 @@ describe("PerpEngine - Fixed Test Suite", function () {
         ethers.MaxUint256
     );
 
-    // CRITICAL: Fund the liquidity pool
+    // Fund the liquidity pool
     await liquidityPool.connect(lpProvider).deposit(toUSD("100000")); // 100k USDC liquidity
 
     // Verify setup
@@ -370,7 +370,6 @@ describe("PerpEngine - Fixed Test Suite", function () {
       await perpEngine.connect(trader1).openPosition(Asset.TSLA, toUSD("2000"), toUSD("4000"), true);
     });
 
-    // FIX TEST: Update both oracle and DEX prices to avoid funding issues
     it("Should close position with profit", async function () {
       // Increase BOTH prices to create profit without funding deviation
       await mockChainlinkManager.setPrice(Asset.TSLA, toPrice("110"));
@@ -458,7 +457,6 @@ describe("PerpEngine - Fixed Test Suite", function () {
     });
   });
 
-  // NEW TEST SECTION: Funding Rate Tests
   describe("Funding Rate Mechanism", function () {
     beforeEach(async function () {
       await perpEngine.connect(trader1).openPosition(Asset.TSLA, toUSD("2000"), toUSD("4000"), true);
@@ -535,7 +533,6 @@ describe("PerpEngine - Fixed Test Suite", function () {
     });
   });
 
-  // NEW TEST SECTION: Borrowing Fee Tests
   describe("Borrowing Fee Mechanism", function () {
     it("Should accrue borrowing fees correctly", async function () {
       // Set borrowing rate to 10% annual (1000 bps)
@@ -688,7 +685,6 @@ describe("PerpEngine - Fixed Test Suite", function () {
       expect(await perpEngine.maxUtilizationBps()).to.equal(9000);
     });
 
-    // NEW TEST: Update borrowing rate
     it("Should allow owner to update borrowing rate", async function () {
       await perpEngine.setBorrowingRateAnnualBps(500); // 5% annual
       expect(await perpEngine.borrowingRateAnnualBps()).to.equal(500);
@@ -759,7 +755,6 @@ describe("PerpEngine - Fixed Test Suite", function () {
       expect(applShort).to.equal(0);
     });
 
-    // NEW TEST: Handle funding rate sign changes
     it("Should handle funding rate sign changes correctly", async function () {
       await perpEngine.connect(trader1).openPosition(Asset.TSLA, toUSD("1000"), toUSD("2000"), true);
       
@@ -787,7 +782,6 @@ describe("PerpEngine - Fixed Test Suite", function () {
       expect(fundingRate2).to.be.lt(fundingRate1);
     });
 
-    // NEW TEST: Position at exact minimum collateral
     it("Should handle positions at exact minimum collateral ratio", async function () {
       // Create position at exactly 10% margin
       const size = toUSD("10000");
@@ -824,7 +818,6 @@ describe("PerpEngine - Fixed Test Suite", function () {
       expect(position.sizeUsd).to.equal(toUSD("4000"));
       expect(position.isLong).to.equal(true);
       expect(position.entryPrice).to.equal(toPrice("100"));
-      // FIX: entryFundingRate is now int256
       expect(position.entryFundingRate).to.equal(0);
     });
 
@@ -846,7 +839,6 @@ describe("PerpEngine - Fixed Test Suite", function () {
       expect(await perpEngine.hasVaultHedge(Asset.APPL)).to.equal(false);
     });
 
-    // NEW TEST: Get vault hedge position details
     it("Should return correct vault hedge position details", async function () {
       const [sizeUsd, collateral, entryPrice, currentPnL, currentValue, exists] = 
         await perpEngine.getVaultHedgePosition(Asset.TSLA);
@@ -859,7 +851,6 @@ describe("PerpEngine - Fixed Test Suite", function () {
       expect(exists).to.equal(true);
     });
 
-    // NEW TEST: Funding rate view
     it("Should return funding rate as signed integer", async function () {
       // Create price deviation
       await mockChainlinkManager.setDexPrice(Asset.TSLA, toPrice("95")); // 5% discount
@@ -876,7 +867,6 @@ describe("PerpEngine - Fixed Test Suite", function () {
     });
   });
 
-  // NEW TEST SECTION: Integration Tests
   describe("Integration Tests", function () {
     it("Should handle complex scenario with multiple positions and price changes", async function () {
       // Setup positions
