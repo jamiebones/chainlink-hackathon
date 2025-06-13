@@ -3,45 +3,62 @@ pragma solidity ^0.8.28;
 
 import {Utils} from "../lib/Utils.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+import {AAPLOracleManager} from "./AAPLOracleManager.sol";
+import {TSLAOracleManager} from "./TSLAOracleManager.sol";
+import {MarketStatusOracle} from "./MarketStatusOracle.sol";
+
 
 contract ChainlinkManager {
-    address public constant TSLA_USD_FEED =
-        0x3609baAa0a9b1f0FE4d6CC01884585d0e191C3E3; //on Arbitruim
-    address public constant APPL_USD_FEED =
-        0x8d0CC5f38f9E802475f2CFf4F9fc7000C2E1557c; //on Arbitruim
-    AggregatorV3Interface public TSLA_dataFeed;
-    AggregatorV3Interface public APPL_dataFeed;
+    
+    AAPLOracleManager aAPLOracleManager;
+    TSLAOracleManager tSLAOracleManager;
+    MarketStatusOracle marketStatusOracle;
+
 
     error InvalidAssetType();
 
-    constructor() {
-        TSLA_dataFeed = AggregatorV3Interface(TSLA_USD_FEED);
-        APPL_dataFeed = AggregatorV3Interface(APPL_USD_FEED);
+    constructor(address _tslaOracleManagerAddress, address _aaplOracleManagerAddress, address _marketStatusOraclleAddress) {
+       aAPLOracleManager = AAPLOracleManager(_aaplOracleManagerAddress);
+       tSLAOracleManager = TSLAOracleManager(_tslaOracleManagerAddress);
+       marketStatusOracle = MarketStatusOracle(_marketStatusOraclleAddress);
     }
 
     /// @dev Fetch latest price from Chainlink Data Feed
     function getPrice(Utils.Asset assetType) external view returns (uint256) {
-        AggregatorV3Interface dataFeed;
+        
         if (assetType == Utils.Asset.TSLA) {
-            dataFeed = TSLA_dataFeed;
+           return tSLAOracleManager.getPriceTSLA() * 1e18; //18 decimals
         } else if (assetType == Utils.Asset.APPL) {
-            dataFeed = APPL_dataFeed;
+           return aAPLOracleManager.getPriceAAPL() * 1e18; //18 decimals 
         } else {
             revert InvalidAssetType();
         }
-        (
-            ,
-            /* uint80 roundId */ int256 answer /*uint256 startedAt*/ /*uint256 updatedAt*/ /*uint80 answeredInRound*/,
-            ,
-            ,
-
-        ) = dataFeed.latestRoundData();
-        return uint256(answer);
+        
     }
 
-    function getDexPriceofAsset(
+    function getTwapPriceofAsset(
         Utils.Asset assetType
     ) external view returns (uint256) {
-        return 1e18; //for now
+           if (assetType == Utils.Asset.TSLA) {
+           return tSLAOracleManager.twap() * 1e16; //18 decimals
+        } else if (assetType == Utils.Asset.APPL) {
+           return aAPLOracleManager.twap() * 1e16; //18 decimals 
+        } else {
+            revert InvalidAssetType();
+        }
+    }
+
+    function checkIfAssetIsPaused(Utils.Asset assetType) external view returns (bool){
+             if (assetType == Utils.Asset.TSLA) {
+           return tSLAOracleManager.isPaused();
+        } else if (assetType == Utils.Asset.APPL) {
+           return aAPLOracleManager.isPaused();
+        } else {
+            revert InvalidAssetType();
+        }
+    }
+
+    function isMarketOpen() public view returns (bool){
+        return marketStatusOracle.isMarketOpen();
     }
 }
