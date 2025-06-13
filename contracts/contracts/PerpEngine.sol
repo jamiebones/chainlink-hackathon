@@ -225,7 +225,7 @@ contract PerpEngine is Ownable, ReentrancyGuard {
             if (pos.isLong) {
                 // Longs pay funding
                 if (uint256(fundingFee) >= pos.collateral) {
-                    return false; // FIX #3: Signal that funding wasn't applied
+                    return false; // Signal that funding wasn't applied
                 }
                 newCollateral = pos.collateral - uint256(fundingFee);
             } else {
@@ -241,7 +241,7 @@ contract PerpEngine is Ownable, ReentrancyGuard {
             } else {
                 // Shorts pay funding
                 if (absFee >= pos.collateral) {
-                    return false; // FIX #3: Signal that funding wasn't applied
+                    return false; // Signal that funding wasn't applied
                 }
                 newCollateral = pos.collateral - absFee;
             }
@@ -263,7 +263,6 @@ contract PerpEngine is Ownable, ReentrancyGuard {
         uint256 elapsed = block.timestamp - pos.lastBorrowingUpdate;
         if (elapsed == 0) return;
 
-        // FIX #4: Clear calculation using annual rate
         // fee = positionSize * (annualRate / 365 days) * elapsed
         uint256 fee = pos.sizeUsd * borrowingRateAnnualBps * elapsed / (365 days) / 10000;
 
