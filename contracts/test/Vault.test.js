@@ -487,6 +487,41 @@ describe("Vault", function () {
         });
     });
 
+    describe("Fee Receiver", function () {
+        it("Should transfer fee to fee receiver when a position is redeemed", async function () {
+            const { vault, vaultAddress, mockUSDC, mockSTSLA, trader, mockChainlinkManager, admin } = await loadFixture(deployVaultFixture);
+            const assetType = Utils.Asset.TSLA;
+            const numShares = ethers.parseUnits("10", 18);
+        
+            // Open a position (assumed helper function)
+            await openPosition(vault, mockUSDC, trader, mockChainlinkManager, assetType, numShares);
+            
+            // Fund the Vault with extra USDC so that redemption can pay out:
+            // (Assuming USDC has 6 decimals)
+            const extraUSDC = ethers.parseUnits("1000", 6);
+            await mockUSDC.connect(trader).transfer(vaultAddress, extraUSDC);
+        
+            // Capture fee receiver balance BEFORE redemption:
+            const feeReceiverBefore = await mockUSDC.balanceOf(admin.address);
+        
+            // Set TWAP price to introduce a fee deviation (ensure non-zero fee)
+            // For example, if chainlink price is 100*1e8, set dex price to 99*1e8.
+            await mockChainlinkManager.setDexPrice(assetType, 99n * BigInt(1e8));
+        
+            // Trader approves redemption of half the shares:
+            const redeemAmount = ethers.parseUnits("5", 18);
+            await mockSTSLA.connect(trader).approve(vaultAddress, redeemAmount);
+        
+            // Redeem stock (this should trigger a fee transfer to fee receiver)
+            const tx = await vault.connect(trader).redeemStock(assetType, redeemAmount);
+            await tx.wait();
+        
+            // Capture fee receiver balance AFTER redemption:
+            const feeReceiverAfter = await mockUSDC.balanceOf(admin.address);
+        
+            expect(feeReceiverAfter).to.be.gt(feeReceiverBefore);
+        });
+    });
 
 });
 
