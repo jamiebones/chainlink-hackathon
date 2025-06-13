@@ -48,6 +48,9 @@ describe("Vault", function () {
         );
         await vault.waitForDeployment();
 
+        // NEW: Set fee receiver so redemption fee can be transferred
+        await vault.connect(admin).setFeeReceiver(admin.address);
+
         const vaultAddress = await vault.getAddress();
 
         // Initialize protocol
