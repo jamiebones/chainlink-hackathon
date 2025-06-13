@@ -32,7 +32,7 @@ export default function Providers({ children }: { children: ReactNode }) {
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider>
-          <header className="w-full sticky top-0 z-50 bg-[#181A20] border-b border-white/10 shadow-sm">
+          <header className="w-full sticky top-0 z-50 bg-[#111112] border-b border-white/10 shadow-sm">
             <div className="max-w-7xl mx-auto flex justify-between items-center px-6 py-4">
               <div className="flex items-center gap-10">
                 <h1 className="text-2xl font-bold text-white tracking-tight">sTSLA Dashboard</h1>
@@ -44,7 +44,7 @@ export default function Providers({ children }: { children: ReactNode }) {
               <ConnectButton />
             </div>
           </header>
-          <main className="bg-[#18181B] min-h-screen pt-4">
+          <main className="bg-[#111112] min-h-screen pt-4">
             {children}
           </main>
         </RainbowKitProvider>

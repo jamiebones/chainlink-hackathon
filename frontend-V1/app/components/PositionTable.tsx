@@ -56,7 +56,7 @@ export default function PositionTable() {
 
   if (MOCK_POSITIONS.length === 0) {
     return (
-      <div className="bg-gray-900 border border-gray-700 rounded-xl p-6">
+      <div className=" border border-gray-700 rounded-xl p-6">
         <h2 className="text-xl font-semibold text-yellow-400 mb-4">Open Positions</h2>
         <div className="text-center py-12">
           <div className="text-gray-500 text-lg mb-2">No open positions</div>
@@ -67,7 +67,7 @@ export default function PositionTable() {
   }
 
   return (
-    <div className="bg-gray-900 border border-gray-700 rounded-xl p-6">
+    <div className=" border border-gray-700 rounded-xl p-6">
       <h2 className="text-xl font-semibold text-yellow-400 mb-6">Open Positions</h2>
       
       <div className="overflow-x-auto">
@@ -157,7 +157,7 @@ export default function PositionTable() {
       </div>
       
       {/* Summary Footer */}
-      <div className="mt-6 p-4 bg-gray-800 rounded-lg border border-gray-600">
+      <div className="mt-6 p-4 rounded-lg border border-gray-600">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
           <div>
             <div className="text-gray-400">Total Collateral</div>
