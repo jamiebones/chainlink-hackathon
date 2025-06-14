@@ -528,7 +528,7 @@ contract Vault is ReentrancyGuard {
     function _checkPriceAndMarketStatus(Utils.Asset asset) internal view {
         // Check if market is open
         if (!isStarted) revert NotStarted();
-        if (!chainlinkManager.isMarketOpen()) revert MarketNotOpen();
+      
 
         // Check if asset is paused
         if (chainlinkManager.checkIfAssetIsPaused(asset))

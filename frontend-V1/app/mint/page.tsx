@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import VaultABI from '../../utils/vault.json'
 
-const VAULT_ADDRESS = "0x8907688286438B6Cc36F8d63De348dCd6278cFc1"; // <--- REPLACE with your address
+const VAULT_ADDRESS = "0x6253c1DF5955eeD1B29006F34286CF37b4DABFEE"; // <--- REPLACE with your address
 
 const assetLabelToEnum = {
   sTSLA: 0, 

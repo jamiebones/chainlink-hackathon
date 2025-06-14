@@ -14,10 +14,9 @@ contract MarketStatusOracle is FunctionsClient, ConfirmedOwner {
     bytes public s_lastError;
 
     bool public isMarketOpen;
-
-    address constant router = 0x234a5fb5Bd614a7AA2FfAB244D603abFA0Ac5C5C;
+address constant router = 0xA9d587a00A31A52Ed70D6026794a8FC5E2F5dCb0;
     bytes32 constant donID =
-        0x66756e2d617262697472756d2d7365706f6c69612d3100000000000000000000;
+       0x66756e2d6176616c616e6368652d66756a692d31000000000000000000000000;
     uint32 constant gasLimit = 200000;
 
     // Finnhub API key is hardcoded below!
