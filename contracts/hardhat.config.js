@@ -1,4 +1,5 @@
 require("@nomicfoundation/hardhat-toolbox");
+require("@nomicfoundation/hardhat-verify"); // Add this for verification
 require("dotenv").config();
 
 // Ensure required environment variables are set
@@ -69,7 +70,6 @@ module.exports = {
       accounts: [DEPLOYER_PRIVATE_KEY, LP_PROVIDER_PRIVATE_KEY, FEE_RECEIVER_PRIVATE_KEY],
       gasPrice: "auto",
       gas: "auto",
-
       router: "0x97083e831f8f0638855e2a515c90edcf158df238",
       donId: "0x66756e2d617262697472756d2d6d61696e6e65742d3100000000000000000000",
       gasLimit: 300000
@@ -81,7 +81,6 @@ module.exports = {
       accounts: [DEPLOYER_PRIVATE_KEY, LP_PROVIDER_PRIVATE_KEY, FEE_RECEIVER_PRIVATE_KEY],
       gasPrice: "auto",
       gas: "auto",
-
       router: "0x234a5fb5Bd614a7AA2FfAB244D603abFA0Ac5C5C",
       donId: "0x66756e2d617262697472756d2d7365706f6c69612d3100000000000000000000",
       gasLimit: 300000
@@ -94,7 +93,6 @@ module.exports = {
       accounts: [DEPLOYER_PRIVATE_KEY, LP_PROVIDER_PRIVATE_KEY, FEE_RECEIVER_PRIVATE_KEY],
       gasPrice: "auto",
       gas: "auto",
-
       router: "0x65Dcc24F8ff9e51F10DCc7Ed1e4e2A61e6E14bd6",
       donId: "0x66756e2d657468657265756d2d6d61696e6e65742d3100000000000000000000",
       gasLimit: 300000
@@ -106,14 +104,13 @@ module.exports = {
       accounts: [DEPLOYER_PRIVATE_KEY, LP_PROVIDER_PRIVATE_KEY, FEE_RECEIVER_PRIVATE_KEY],
       gasPrice: "auto",
       gas: "auto",
-
       router: "0xb83E47C2bC239B3bf370bc41e1459A34b41238D0",
       donId: "0x66756e2d657468657265756d2d7365706f6c69612d3100000000000000000000",
       gasLimit: 300000
     },
-    
   },
   
+  // FIXED: Moved etherscan config out of networks
   etherscan: {
     apiKey: {
       // Ethereum
@@ -124,24 +121,24 @@ module.exports = {
       arbitrumOne: ARBISCAN_API_KEY,
       arbitrumSepolia: ARBISCAN_API_KEY,
     },
-    
-    gasReporter: {
-      enabled: process.env.REPORT_GAS === "true",
-      currency: "USD",
-      gasPrice: 21,
-      coinmarketcap: process.env.COINMARKETCAP_API_KEY,
-    },
-    
-    paths: {
-      sources: "./contracts",
-      tests: "./test",
-      cache: "./cache",
-      artifacts: "./artifacts",
-      scripts: "./scripts",
-    },
-    
-    mocha: {
-      timeout: 300000, // 5 minutes - useful for forking tests
-    },
+  },
+  
+  // FIXED: Moved these configs to root level
+  gasReporter: {
+    enabled: process.env.REPORT_GAS === "true",
+    currency: "USD",
+    gasPrice: 21,
+    coinmarketcap: process.env.COINMARKETCAP_API_KEY,
+  },
+  
+  paths: {
+    sources: "./contracts",
+    tests: "./test",
+    cache: "./cache",
+    artifacts: "./artifacts",
+  },
+  
+  mocha: {
+    timeout: 300000, // 5 minutes - useful for forking tests
   },
 };

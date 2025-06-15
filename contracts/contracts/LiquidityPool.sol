@@ -73,11 +73,17 @@ contract LiquidityPool is Ownable, ReentrancyGuard, ERC20("Synthetic Equity Liqu
         if (usdc.balanceOf(msg.sender) < amount) revert InsufficientUSDC();
 
 
-        uint256 lpAmount = totalSupply() == 0 ? amount : (amount * totalSupply()) / totalLiquidity;
-
+        uint256 pre = usdc.balanceOf(address(this));
         usdc.transferFrom(msg.sender, address(this), amount);
-        totalLiquidity += amount;
+        uint256 received = usdc.balanceOf(address(this)) - pre;
+        require(received > 0, "ZeroReceived");
+
+        uint256 lpAmount = totalSupply()==0 ? received
+                        : received * totalSupply() / totalLiquidity;
+        totalLiquidity += received;
+
         _mint(msg.sender, lpAmount);
+        _updateFeeCheckpoint(msg.sender);   
 
         emit Deposited(msg.sender, amount, lpAmount);
     }
@@ -107,7 +113,6 @@ contract LiquidityPool is Ownable, ReentrancyGuard, ERC20("Synthetic Equity Liqu
         if (amount > availableLiquidity()) revert InsufficientLiquidity();
 
         reservedLiquidity += amount;
-        emit Reserved(amount);
     }
 
     /// @notice Called by PerpMarket to release liquidity back to a recipient or vault
@@ -162,13 +167,12 @@ contract LiquidityPool is Ownable, ReentrancyGuard, ERC20("Synthetic Equity Liqu
         uint256 share = (lpBalance * delta) / supply;
 
         if (share > 0) {
-            usdc.transfer(user, share);
             totalLiquidity -= share;
             totalFeesClaimed += share;
+            usdc.transfer(user, share);
+            userFeeCheckpoint[user] = totalFeesCollected;
             emit FeeClaimed(user, share);
         }
-
-        userFeeCheckpoint[user] = totalFeesCollected;
     }
 
     function _updateFeeCheckpoint(address user) internal {

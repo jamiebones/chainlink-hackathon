@@ -1,0 +1,24 @@
+{
+  "network": "sepolia",
+  "chainId": 11155111,
+  "deployer": "0x71C70066F9D1128126a1A5e36Dee8FAfF4C55d30",
+  "timestamp": "2025-06-15T16:39:48.815Z",
+  "contracts": {
+    "usdc": "0x9Ac8BFeDaCF1fe19892804303d0Ed24212c4617a",
+    "marketStatusOracle": "0xE53B621A68e22276954A53A1E52661D7Fbf4885E",
+    "tslaOracle": "0x3d013cEE5aCd75DD5825f2624cb3EB5fC5519d16",
+    "aaplOracle": "0xab1563BDaF72A847EDF158A5F169959AcC633215",
+    "chainlinkManager": "0xcBcB7f286407977B2A8206365DF9B2a57B176Fd1",
+    "liquidityPool": "0x29160f2dB2C368bF25430656966548c41928B665",
+    "vault": "0x2Bc1ef129c16D20646F3BE9565D844bCD1CD219f",
+    "perpEngine": "0x55ad46E40B39D67c87748019fF9EF366D65a41e5",
+    "sTSLA": "0x941aD43Ca57982a9b6B136204c7D0ae48f9bD103",
+    "sAPPL": "0x73082E50577e977494790CA395D7516Be7D5dcBD"
+  },
+  "configuration": {
+    "initialLiquidityUSDC": "1000000000",
+    "oracleWindowSize": 60,
+    "feeReceiver": "0x71C70066F9D1128126a1A5e36Dee8FAfF4C55d30",
+    "lpProvider": "0x71C70066F9D1128126a1A5e36Dee8FAfF4C55d30"
+  }
+}

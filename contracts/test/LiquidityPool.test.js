@@ -201,10 +201,6 @@ describe("LiquidityPool", function () {
       
       expect(await liquidityPool.reservedLiquidity()).to.equal(reserveAmount);
       expect(await liquidityPool.availableLiquidity()).to.equal(DEPOSIT_AMOUNT - reserveAmount);
-
-      await expect(tx)
-        .to.emit(liquidityPool, "Reserved")
-        .withArgs(reserveAmount);
     });
 
     it("Should revert when non-perp tries to reserve", async function () {
