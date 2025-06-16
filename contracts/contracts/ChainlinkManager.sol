@@ -28,9 +28,9 @@ contract ChainlinkManager {
     function getPrice(Utils.Asset assetType) external view returns (uint256) {
         
         if (assetType == Utils.Asset.TSLA) {
-           return tSLAOracleManager.getPriceTSLA() * 1e18; //18 decimals
+           return tSLAOracleManager.getPriceTSLA() * 1e16; //18 decimals
         } else if (assetType == Utils.Asset.APPL) {
-           return aAPLOracleManager.getPriceAAPL() * 1e18; //18 decimals 
+           return aAPLOracleManager.getPriceAAPL() * 1e16; //18 decimals 
         } else {
             revert InvalidAssetType();
         }
