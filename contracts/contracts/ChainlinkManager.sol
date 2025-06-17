@@ -25,7 +25,7 @@ contract ChainlinkManager {
     }
 
     /// @dev Fetch latest price from Chainlink Data Feed
-    function getPrice(Utils.Asset assetType) external view returns (uint256) {
+    function getPrice(Utils.Asset assetType) public view returns (uint256) {
         
         if (assetType == Utils.Asset.TSLA) {
            return tSLAOracleManager.getPriceTSLA() * 1e16; //18 decimals
@@ -62,4 +62,8 @@ contract ChainlinkManager {
     function isMarketOpen() public view returns (bool){
         return marketStatusOracle.isMarketOpen();
     }
+
+    function getDexPrice(Utils.Asset asset) external view returns(uint256){
+        return getPrice(asset);
+    } 
 }

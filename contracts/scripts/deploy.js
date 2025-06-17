@@ -22,7 +22,7 @@ const CONFIG = {
   chainlinkSubscriptionId: 15598, // Update with your subscription ID
   
   // Initial liquidity amounts
-  initialLiquidityUSDC: ethers.parseUnits("1000", 6), // 1000 USDC
+  initialLiquidityUSDC: ethers.parseUnits("100000000000", 6), // 100000000000 USDC
   
   // Team addresses
   treasury: null, // Will use deployer if not set
