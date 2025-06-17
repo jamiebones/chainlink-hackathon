@@ -1,8 +1,70 @@
-type ExampleEntity @entity {
+type Vault @entity(immutable: false) {
   id: ID!
-  count: BigInt!
+  trader: Bytes! # address
+  positionId: BigInt!
+  assetType: String! # "TSLA" or "APPL"
+  mintedAmount: BigInt!
+  bufferCollateral: BigInt! # USDC (6 decimals)
+  hedgedCollateral: BigInt! # USDC (6 decimals)
+  entryPrice: BigInt! # 18 decimals
+  createdAt: BigInt! # timestamp
+  closedAt: BigInt # timestamp
+  isActive: Boolean!
+  burnedAmount: BigInt # at closure
+  amountRefunded: BigInt # USDC (6 decimals)
+  redemptionFee: BigInt # USDC (6 decimals)
+}
+
+type Position @entity (immutable: false) {
+  id: ID!
+  trader: Bytes! # address
+  mintedAmount: BigInt!
+  bufferCollateral: BigInt! # USDC (6 decimals)
+  hedgedCollateral: BigInt! # USDC (6 decimals)
+  entryPrice: BigInt! # 18 decimals
+  positionIndex: BigInt!
+  timestamp: BigInt!
+  assetType: String! # "TSLA" or "APPL"
+  paidOut: Boolean!
+  isActive: Boolean!
+  closedTimestamp: BigInt
+  amountRefunded: BigInt
+  redemptionFee: BigInt
+}
+
+type Withdrawal @entity (immutable: true) {
+  id: ID!
+  trader: Bytes! # address
+  amountUSDC: BigInt! # USDC (6 decimals)
+  assetType: String! # "TSLA" or "APPL"
+  timestamp: BigInt!
+}
+
+type FundingSettlement @entity (immutable: true) {
+  id: ID!
+  asset: String! # "TSLA" or "APPL"
+  delta: BigInt! # Signed amount (positive = gain, negative = loss)
+  date: BigInt!
+}
+
+type FeeCollection @entity (immutable: true) {
+  id: ID!
   user: Bytes! # address
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
-} 
+  amountUSDC: BigInt! # USDC (6 decimals)
+  type: String! # "MINT" or "REDEMPTION"
+  timestamp: BigInt!
+}
+
+type PerpEngineUpdate @entity (immutable: true) {
+  id: ID!
+  newPerp: Bytes! # address
+  timestamp: BigInt!
+}
+
+type ProtocolMetric @entity (immutable: true) {
+  id: ID! # "global"
+  totalTSLABuffer: BigInt!
+  totalAPPLBuffer: BigInt!
+  totalTSLADebt: BigInt!
+  totalAPPLDebt: BigInt!
+}

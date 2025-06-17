@@ -19,7 +19,7 @@ const { router, donId, gasLimit } = network.config;
 // Deployment configuration
 const CONFIG = {
   // Chainlink subscription IDs (update for your network)
-  chainlinkSubscriptionId: 1, // Update with your subscription ID
+  chainlinkSubscriptionId: 15598, // Update with your subscription ID
   
   // Initial liquidity amounts
   initialLiquidityUSDC: ethers.parseUnits("1000", 6), // 1000 USDC
@@ -29,7 +29,7 @@ const CONFIG = {
   teamMultisig: null, // Will use deployer if not set
   
   // Oracle configuration
-  oracleWindowSize: 60, // 60 data points for TWAP
+  oracleWindowSize: 10, // 60 data points for TWAP
   
   // Fee configuration
   lpShare: 7000, // 70%
@@ -95,9 +95,7 @@ async function main() {
     const tslaOracle = await TSLAOracleManager.deploy(
         CONFIG.oracleWindowSize,
         deployments.marketStatusOracle,
-        router,
-        donId,
-        gasLimit
+        
     );
     await tslaOracle.waitForDeployment();
     deployments.tslaOracle = await tslaOracle.getAddress();
@@ -106,10 +104,7 @@ async function main() {
     // Deploy AAPLOracleManager
     const AAPLOracleManager = await ethers.getContractFactory("AAPLOracleManager");
     const aaplOracle = await AAPLOracleManager.deploy(
-        CONFIG.oracleWindowSize,
-        router,
-        donId,
-        gasLimit
+        CONFIG.oracleWindowSize
     );
     await aaplOracle.waitForDeployment();
     deployments.aaplOracle = await aaplOracle.getAddress();

@@ -31,14 +31,10 @@ contract TSLAOracleManager is FunctionsClient, ConfirmedOwner {
     IMarketStatusOracle public marketStatusOracle;
 
     // Chainlink config (update for your network as needed)
-    // address constant router = 0x234a5fb5Bd614a7AA2FfAB244D603abFA0Ac5C5C;
-    // bytes32 constant donID =
-    //     0x66756e2d617262697472756d2d7365706f6c69612d3100000000000000000000;
-    // uint32 constant gasLimit = 300000;
-
-    address public immutable router;
-    bytes32 public immutable donID;
-    uint32  public immutable gasLimit;
+    address constant router = 0xA9d587a00A31A52Ed70D6026794a8FC5E2F5dCb0;
+    bytes32 constant donID =
+       0x66756e2d6176616c616e6368652d66756a692d31000000000000000000000000;
+    uint32 constant gasLimit = 300000;
 
     string constant source =
         'const apiKey = "VQCHMJ6090ZBZRLX";\n'
@@ -58,10 +54,7 @@ contract TSLAOracleManager is FunctionsClient, ConfirmedOwner {
 
     constructor(
         uint256 _windowSize,
-        address _marketStatusOracle,
-        address _router,
-        bytes32 _donID,
-        uint32 _gasLimit
+        address _marketStatusOracle
     ) FunctionsClient(router) ConfirmedOwner(msg.sender) {
         require(_windowSize > 0 && _windowSize < 1000, "Invalid window size");
         windowSize = _windowSize;
@@ -69,10 +62,6 @@ contract TSLAOracleManager is FunctionsClient, ConfirmedOwner {
         pointer = 0;
         priceCount = 0;
         marketStatusOracle = IMarketStatusOracle(_marketStatusOracle);
-
-        router = _router;
-        donID = _donID;
-        gasLimit = _gasLimit;
     }
 
     // Allows owner to update window size (resets price history)
