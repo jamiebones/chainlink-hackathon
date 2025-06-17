@@ -1,12 +1,13 @@
-// app/trade/page.tsx
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
 import MarketChart from '../components/MarketChart'
 import TradeForm from '../components/TradeForm'
 import PositionTable from '../components/PositionTable'
 
 export default function TradePage() {
+  const [symbol, setSymbol] = useState<'TSLA' | 'APPL'>('TSLA')
+
   return (
     <div className="min-h-screen bg-slate-950">
       {/* Header */}
@@ -19,29 +20,20 @@ export default function TradePage() {
                 <div className="w-2 h-2 bg-green-400 rounded-full"></div>
                 <span>Arbitrum</span>
               </div>
-              <div className="px-3 py-1 bg-slate-800 rounded-lg text-sm text-slate-300">
-                TSLA: $185.25
-              </div>
             </div>
           </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto p-4 space-y-6">
-        {/* Main Trading Grid */}
         <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
-          {/* Chart Section */}
           <div className="xl:col-span-3">
-            <MarketChart symbol="sTSLA" />
+          <MarketChart symbol={symbol === 'TSLA' ? 'TSLA' : 'AAPL'} />
           </div>
-          
-          {/* Trade Form */}
           <div className="xl:col-span-1">
-            <TradeForm />
+            <TradeForm symbol={symbol} setSymbol={setSymbol} />
           </div>
         </div>
-        
-        {/* Positions Table */}
         <PositionTable />
       </div>
     </div>

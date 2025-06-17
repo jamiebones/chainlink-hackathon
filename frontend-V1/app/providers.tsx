@@ -6,11 +6,37 @@ import {
   ConnectButton,
   getDefaultConfig,
 } from '@rainbow-me/rainbowkit';
-import { WagmiProvider } from 'wagmi';
-import {arbitrum, arbitrumSepolia} from 'wagmi/chains';
+import { WagmiProvider} from 'wagmi';
+import type { Chain } from 'viem/chains';
+import { arbitrum, arbitrumSepolia, sepolia } from 'wagmi/chains';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { ReactNode } from 'react';
+
+// ✅ Define custom Fuji (Avalanche C-Chain Testnet)
+export const fuji: Chain = {
+  id: 43113,
+  name: 'Avalanche Fuji',
+  nativeCurrency: {
+    name: 'Avalanche',
+    symbol: 'AVAX',
+    decimals: 18,
+  },
+  rpcUrls: {
+    default: {
+      http: ['https://api.avax-test.network/ext/bc/C/rpc'],
+    },
+    public: {
+      http: ['https://api.avax-test.network/ext/bc/C/rpc'],
+    },
+  },
+  blockExplorers: {
+    default: {
+      name: 'SnowTrace',
+      url: 'https://testnet.snowtrace.io/',
+    },
+  },
+};
 
 export default function Providers({ children }: { children: ReactNode }) {
   const [config, setConfig] = useState<ReturnType<typeof getDefaultConfig> | null>(null);
@@ -20,7 +46,7 @@ export default function Providers({ children }: { children: ReactNode }) {
     const config = getDefaultConfig({
       appName: 'sTSLA Hackathon App',
       projectId: 'e872ba5075a2eb7e208dcaeb0bd70e37',
-      chains: [arbitrum, arbitrumSepolia],
+      chains: [arbitrum, arbitrumSepolia, sepolia, fuji], // ✅ Added Fuji
       ssr: false,
     });
     setConfig(config);
