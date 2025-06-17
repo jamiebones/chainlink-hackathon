@@ -28,7 +28,6 @@ interface IChainLinkManager {
 
 interface IVault {
     function syncFundingPnL(Utils.Asset asset, int256 fundingDelta) external;
-    function syncFee(Utils.Asset asset, uint256 feeAmount) external;
 }
 
 contract PerpEngine is Ownable, ReentrancyGuard {
@@ -84,7 +83,7 @@ contract PerpEngine is Ownable, ReentrancyGuard {
         uint256 entryPrice;
         int256 entryFundingRate;
         bool isLong;
-        uint256 lastBorrowingUpdate;  // timestamp
+        uint256 lastBorrowingUpdate; 
     }
 
     mapping(address => mapping(Utils.Asset => bytes32)) public vaultHedgePositions;
@@ -274,7 +273,6 @@ contract PerpEngine is Ownable, ReentrancyGuard {
         if (fee >= pos.collateral) revert FeeIsGreaterThanCollateral();
         pos.collateral -= fee;
 
-        IVault(vaultAddress).syncFee(asset, fee);
         pos.lastBorrowingUpdate = block.timestamp;
     }
 
@@ -598,8 +596,14 @@ contract PerpEngine is Ownable, ReentrancyGuard {
         pos.collateral -= proportionalCollateral;
 
         if (pos.isLong) {
-            longOpenInterestUsd[asset] -= reduceSizeUsd;
-            longOpenInterestTokens[asset] -= (reduceSizeUsd * 1e18) / entry;
+                longOpenInterestUsd[asset] -= reduceSizeUsd;
+    
+                uint256 tokensToReduce = (reduceSizeUsd * 1e18) / entry;
+                if (tokensToReduce >= longOpenInterestTokens[asset]) {
+                    longOpenInterestTokens[asset] = 0;
+                } else {
+                    longOpenInterestTokens[asset] -= tokensToReduce;
+                }
         } else {
             shortOpenInterestUsd[asset] -= reduceSizeUsd;
         }
@@ -763,7 +767,8 @@ contract PerpEngine is Ownable, ReentrancyGuard {
         uint256 collateral,
         uint256 entryPrice,
         int256 entryFundingRate,
-        bool isLong
+        bool isLong,
+        uint256 lastBorrowingUpdate
     ) {
         Position memory p = positions[user][asset];
         return (
@@ -771,7 +776,8 @@ contract PerpEngine is Ownable, ReentrancyGuard {
             p.collateral,
             p.entryPrice,
             p.entryFundingRate,
-            p.isLong
+            p.isLong,
+            p.lastBorrowingUpdate
         );
     }
 
