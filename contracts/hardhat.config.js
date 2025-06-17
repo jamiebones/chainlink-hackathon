@@ -122,7 +122,7 @@ module.exports = {
       arbitrumOne: ARBISCAN_API_KEY,
       arbitrumSepolia: ARBISCAN_API_KEY,
       // Avalanche
-      snowtrace: SNOWTRACE_API_KEY,
+      avalancheFujiTestnet: SNOWTRACE_API_KEY,
     },
   },
 

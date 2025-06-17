@@ -143,7 +143,8 @@ async function main() {
       deployments.usdc,
       deployments.liquidityPool,
       deployments.chainlinkManager,
-      deployments.vault
+      deployments.vault,
+      deployer.address
     );
     await perpEngine.waitForDeployment();
     deployments.perpEngine = await perpEngine.getAddress();
@@ -200,99 +201,7 @@ async function main() {
     console.log("Configuring PerpEngine...");
     await perpEngine.setVaultAddress(deployments.vault);
     console.log(`${colors.green}✅ PerpEngine configured${colors.reset}\n`);
-
-    // // ========================================
-    // // 6. Initialize Liquidity Pool
-    // // ========================================
-    // console.log(`${colors.bright}6. Initializing Liquidity Pool...${colors.reset}`);
-    
-    // // Approve LP to spend USDC
-    // const usdcContract = await ethers.getContractAt("MockERC20", deployments.usdc);
-    // await usdcContract.connect(lpProvider).approve(
-    //   deployments.liquidityPool,
-    //   ethers.MaxUint256
-    // );
-    // console.log("LP approval granted");
-
-    // // Deposit initial liquidity
-    // const lpContract = await ethers.getContractAt("LiquidityPool", deployments.liquidityPool);
-    // await lpContract.connect(lpProvider).deposit(CONFIG.initialLiquidityUSDC);
-    // console.log(`${colors.green}✅ Deposited ${ethers.formatUnits(CONFIG.initialLiquidityUSDC, 6)} USDC to LiquidityPool${colors.reset}\n`);
-
-    // // ========================================
-    // // 7. Initialize Oracle Prices (Mock for testing)
-    // // ========================================
-    // console.log(`${colors.bright}7. Setting Initial Oracle Prices (Mock)...${colors.reset}`);
-    
-    // // For mainnet, you'd trigger actual oracle updates
-    // // For testing, we'll use mock prices if available
-    // if (process.env.NETWORK === "localhost" || process.env.NETWORK === "hardhat") {
-    //   console.log(`${colors.yellow}⚠️  Using mock prices for testing${colors.reset}`);
-    //   // If you have mock oracle contracts, set prices here
-    //   // await mockChainlinkManager.setPrice(0, ethers.parseUnits("450", 18)); // TSLA
-    //   // await mockChainlinkManager.setPrice(1, ethers.parseUnits("175", 18)); // AAPL
-    // } else {
-    //   console.log(`${colors.yellow}⚠️  Remember to trigger oracle updates with Chainlink subscription${colors.reset}`);
-    // }
-
-    // // ========================================
-    // // 8. Verify Configuration
-    // // ========================================
-    // console.log(`\n${colors.bright}8. Verifying Deployment...${colors.reset}`);
-    
-    // // Check LiquidityPool state
-    // const totalLiquidity = await lpContract.totalLiquidity();
-    // const availableLiquidity = await lpContract.availableLiquidity();
-    // console.log(`LiquidityPool - Total: ${ethers.formatUnits(totalLiquidity, 6)} USDC`);
-    // console.log(`LiquidityPool - Available: ${ethers.formatUnits(availableLiquidity, 6)} USDC`);
-    
-    // // Check Vault configuration
-    // const vaultContract = await ethers.getContractAt("Vault", deployments.vault);
-    // const isStarted = await vaultContract.isStarted();
-    // console.log(`Vault - Started: ${isStarted}`);
-    
-    // // ========================================
-    // // 9. Save Deployment Addresses
-    // // ========================================
-    // console.log(`\n${colors.bright}9. Saving Deployment Info...${colors.reset}`);
-    
-    // const deploymentInfo = {
-    //   network: network.name,
-    //   chainId: network.config.chainId,
-    //   deployer: deployer.address,
-    //   timestamp: new Date().toISOString(),
-    //   contracts: deployments,
-    //   configuration: {
-    //     initialLiquidityUSDC: CONFIG.initialLiquidityUSDC.toString(),
-    //     oracleWindowSize: CONFIG.oracleWindowSize,
-    //     feeReceiver: feeReceiver.address,
-    //     lpProvider: lpProvider.address
-    //   }
-    // };
-
-    // const deploymentPath = path.join(__dirname, `../deployments/${network.name}_deployment.json`);
-    // fs.mkdirSync(path.dirname(deploymentPath), { recursive: true });
-    // fs.writeFileSync(deploymentPath, JSON.stringify(deploymentInfo, null, 2));
-    
-    // console.log(`${colors.green}✅ Deployment info saved to: ${deploymentPath}${colors.reset}`);
-
-    // // ========================================
-    // // 10. Summary
-    // // ========================================
-    // console.log(`\n${colors.cyan}${'='.repeat(50)}${colors.reset}`);
-    // console.log(`${colors.bright}DEPLOYMENT SUCCESSFUL!${colors.reset}`);
-    // console.log(`${colors.cyan}${'='.repeat(50)}${colors.reset}\n`);
-    
-    // console.log(`${colors.bright}Key Addresses:${colors.reset}`);
-    // console.log(`USDC: ${deployments.usdc}`);
-    // console.log(`LiquidityPool: ${deployments.liquidityPool}`);
-    // console.log(`Vault: ${deployments.vault}`);
-    // console.log(`PerpEngine: ${deployments.perpEngine}`);
-    // console.log(`sTSLA: ${deployments.sTSLA}`);
-    // console.log(`sAPPL: ${deployments.sAPPL}`);
-    // console.log(`ChainlinkManager: ${deployments.chainlinkManager}`);
-
-    return deployments;
+  return deployments;
 
   } catch (error) {
     console.error(`\n${colors.red}❌ Deployment failed:${colors.reset}`, error);

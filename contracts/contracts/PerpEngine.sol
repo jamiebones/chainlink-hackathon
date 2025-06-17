@@ -11,6 +11,7 @@ import { Utils } from "../lib/Utils.sol";
 /// @notice Minimal liquidity pool interface
 interface ILiquidityPool {
     function reserve(uint256 amount) external;
+    function unreserve(uint256 amount) external;
     function releaseTo(address to, uint256 amount) external;
     function reserveFrom(address from, uint256 amount) external;
     function totalLiquidity() external view returns (uint256);
@@ -22,6 +23,7 @@ interface ILiquidityPool {
 interface IChainLinkManager {
     function getPrice(Utils.Asset asset) external view returns (uint256);       // Oracle price (e.g., Chainlink)
     function getDexPrice(Utils.Asset asset) external view returns (uint256);    // DEX (e.g., Uniswap TWAP)
+    function checkIfAssetIsPaused(Utils.Asset assetType) external view returns (bool);
 }
 
 interface IVault {
@@ -64,6 +66,7 @@ contract PerpEngine is Ownable, ReentrancyGuard {
     IChainLinkManager public immutable chainlinkManager;
     address public protocolAccounting;
     address public vaultAddress;
+    address public feeReceiver;  // Protocol treasury address
 
     // --- Funding Rate State ---
     mapping(Utils.Asset => int256) public cumulativeFundingRate; // 1e18 scaled
@@ -112,11 +115,12 @@ contract PerpEngine is Ownable, ReentrancyGuard {
     }
 
     // --- Constructor ---
-    constructor(address _collateral, address _pool, address _chainlinkManager, address _vaultAddress) Ownable(msg.sender) {
+    constructor(address _collateral, address _pool, address _chainlinkManager, address _vaultAddress, address _feeReceiver) Ownable(msg.sender) {
         collateralToken = IERC20(_collateral);
         pool = ILiquidityPool(_pool);
         chainlinkManager = IChainLinkManager(_chainlinkManager);
         vaultAddress = _vaultAddress;
+        feeReceiver = _feeReceiver;
     }
 
     // --------------------------------------------------------
@@ -128,6 +132,7 @@ contract PerpEngine is Ownable, ReentrancyGuard {
     ///   fundingRate = (dexPrice - oraclePrice) / oraclePrice * fundingRateSensitivity
     ///   fundingDelta = fundingRate * elapsedSeconds / 3600
     function _updateFundingRate(Utils.Asset asset) internal {
+        require(!chainlinkManager.checkIfAssetIsPaused(asset), "Oracle paused");
         uint256 nowTime = block.timestamp;
         uint256 last = lastFundingUpdate[asset];
         if (last == 0 || nowTime <= last) {
@@ -308,6 +313,7 @@ contract PerpEngine is Ownable, ReentrancyGuard {
 
     /// --- Position Opening ---
     function openPosition(Utils.Asset asset, uint256 collateralAmount, uint256 sizeUsd, bool isLong) public nonReentrant {
+        require(!chainlinkManager.checkIfAssetIsPaused(asset), "Oracle paused");
         if(collateralAmount == 0 || sizeUsd == 0) revert InvalidPosition();
         if(isPaused) revert MarketPaused();
         if(positions[msg.sender][asset].sizeUsd != 0) revert AlreadyOpen();
@@ -323,8 +329,9 @@ contract PerpEngine is Ownable, ReentrancyGuard {
         if(collateralAmount < openFee) revert FeeIsGreaterThanCollateral();
         collateralAmount -= openFee;
 
-        collateralToken.safeTransferFrom(msg.sender, address(pool), collateralAmount + openFee);
-        pool.collectFee(openFee);
+        require(feeReceiver != address(0), "Fee receiver unset");
+        collateralToken.safeTransferFrom(msg.sender, feeReceiver, openFee);
+        collateralToken.safeTransferFrom(msg.sender, address(pool), collateralAmount);
         pool.reserve(sizeUsd);
 
         uint256 price = chainlinkManager.getPrice(asset);
@@ -380,6 +387,7 @@ contract PerpEngine is Ownable, ReentrancyGuard {
         uint256 addedSizeUsd
     ) public nonReentrant {
         Position storage pos = positions[msg.sender][asset];
+        require(!chainlinkManager.checkIfAssetIsPaused(asset), "Oracle paused");
         if (pos.sizeUsd == 0) revert NoPosition();
         if (isPaused) revert MarketPaused();
 
@@ -406,8 +414,8 @@ contract PerpEngine is Ownable, ReentrancyGuard {
         _validateUtilization(asset, addedSizeUsd, pos.isLong);
 
         // 6. External calls (fee transfer + reserve)
-        collateralToken.safeTransferFrom(msg.sender, address(pool), fee);
-        pool.collectFee(fee);
+        require(feeReceiver != address(0), "Fee receiver unset");
+        collateralToken.safeTransferFrom(msg.sender, feeReceiver, fee);
         pool.reserve(addedSizeUsd);
 
         // 7. Update position struct
@@ -427,6 +435,7 @@ contract PerpEngine is Ownable, ReentrancyGuard {
     }
 
     function openVaultHedge(Utils.Asset asset, uint256 hedgeAmount) external onlyVault returns (bytes32 positionId) {
+        require(!chainlinkManager.checkIfAssetIsPaused(asset), "Oracle paused");
         if (hedgeAmount == 0) revert ZeroAmount();
         
         _updateFundingRate(asset);
@@ -569,8 +578,9 @@ contract PerpEngine is Ownable, ReentrancyGuard {
         uint256 proportionalCollateral = (pos.collateral * closePortion) / 1e18;
         
         int256 grossReturn = int256(proportionalCollateral) + portionPnL;
-        
-        if (grossReturn <= 0) {
+
+        if (grossReturn <= 0) {  // loss > proportionalCollateral
+            pool.unreserve(proportionalCollateral);  // free reserve / incentivise pool 
             _netReturn = 0;
         } else {
             uint256 gross = uint256(grossReturn);
@@ -578,7 +588,8 @@ contract PerpEngine is Ownable, ReentrancyGuard {
             uint256 closeFee = 0;
             if (msg.sender != vaultAddress) {
                 closeFee = (gross * closeFeeBps) / 10000;
-                pool.collectFee(closeFee);
+                require(feeReceiver != address(0), "Fee receiver unset");
+                pool.releaseTo(feeReceiver, closeFee);
             }
             _netReturn = gross - closeFee;
         }
@@ -638,9 +649,9 @@ contract PerpEngine is Ownable, ReentrancyGuard {
 
     function isLiquidatable(address user, Utils.Asset asset) public view returns (bool) {
         Position memory pos = positions[user][asset];
-        if (pos.sizeUsd == 0) return false;
+        if (pos.sizeUsd == 0) revert NoPosition();
         // Vault Positions should not be liquidated
-        if(user == vaultAddress) return false;
+        if(user == vaultAddress) revert NotLiquidatable();
 
         int256 pnl = getPnL(asset, user);
 
@@ -667,12 +678,15 @@ contract PerpEngine is Ownable, ReentrancyGuard {
         if(!isLiquidatable(user, asset)) revert NotLiquidatable();
 
         uint256 penalty = (pos.collateral * liquidationFeeBps) / 10_000;
-        uint256 remaining = pos.collateral > penalty ? pos.collateral - penalty : 0;
 
         // Store all necessary data before deletion
         uint256 positionSize = pos.sizeUsd;
         uint256 entryPrice = pos.entryPrice;
         bool isLong = pos.isLong;
+
+        // Split penalty: 70% to liquidator, 30% to treasury
+        uint256 liquidatorReward = (penalty * 70) / 100;
+        uint256 treasuryReward = penalty - liquidatorReward;
 
         // Update open interest first
         if (isLong) {
@@ -684,11 +698,12 @@ contract PerpEngine is Ownable, ReentrancyGuard {
 
         delete positions[user][asset];
 
-        // Now make external calls
-        pool.collectFee(penalty);
-        pool.releaseTo(msg.sender, penalty);
-        if (remaining > 0) {
-            pool.releaseTo(address(pool), remaining);
+        if (liquidatorReward > 0) {
+            pool.releaseTo(msg.sender, liquidatorReward);
+        }
+        if (treasuryReward > 0) {
+            require(feeReceiver != address(0), "Fee receiver unset");
+            pool.releaseTo(feeReceiver, treasuryReward);
         }
 
         emit PositionLiquidated(user, asset, positionSize, penalty);
@@ -836,11 +851,20 @@ contract PerpEngine is Ownable, ReentrancyGuard {
     function getLiquidationPrice(address user, Utils.Asset asset) external view returns (uint256) {
         Position memory p = positions[user][asset];
         if (p.sizeUsd == 0) return 0;
+        
         uint256 minColl = p.sizeUsd.mulDivDown(minCollateralRatioBps, 10000);
-        // For longs: L = entryPrice * (1 + (minColl - collateral)/sizeUsd)
-        int256 num = int256(minColl) - int256(p.collateral);
-        int256 factor = int256(1e18) + (num * int256(1e18) / int256(p.sizeUsd));
-        return uint256(factor) * p.entryPrice / 1e18;
+        
+        if (p.isLong) {
+            // Long: price needs to drop
+            int256 num = int256(minColl) - int256(p.collateral);
+            int256 factor = int256(1e18) + (num * int256(1e18) / int256(p.sizeUsd));
+            return uint256(factor) * p.entryPrice / 1e18;
+        } else {
+            // Short: price needs to rise
+            int256 num = int256(p.collateral) - int256(minColl);
+            int256 factor = int256(1e18) + (num * int256(1e18) / int256(p.sizeUsd));
+            return uint256(factor) * p.entryPrice / 1e18;
+        }
     }
 
     //added this to be able to call from the vault
@@ -854,6 +878,22 @@ contract PerpEngine is Ownable, ReentrancyGuard {
     // --------------------------------------------------------
 
     function setConfig(uint256 sensitivity, uint256 minCR, uint256 maxUtil) external onlyOwner {
+        require(
+            sensitivity >= 1e15 &&   // 0.1 %
+            sensitivity <= 3e16,     // 3 %
+            "Funding sensitivity out of bounds"
+        );
+        require(
+            minCR >= 1000 &&      // 10%
+            minCR <= 10000,       // 100%
+            "Min collateral ratio out of bounds"
+        );
+        require(
+            maxUtil >= 5000 &&    // 50 %  
+            maxUtil <= 9500,      // 95 %
+            "Max utilization out of bounds"
+        );
+
         fundingRateSensitivity = sensitivity;
         minCollateralRatioBps = minCR;
         maxUtilizationBps = maxUtil;
@@ -870,6 +910,9 @@ contract PerpEngine is Ownable, ReentrancyGuard {
     }
 
     function setFees(uint256 _open, uint256 _close, uint256 _liq) external onlyOwner {
+        require(_open <= 200, "Open fee too high");      // Max 2%
+        require(_close <= 200, "Close fee too high");    // Max 2%
+        require(_liq <= 1000, "Liq fee too high");      // Max 10%
         openFeeBps = _open;
         closeFeeBps = _close;
         liquidationFeeBps = _liq;
@@ -882,6 +925,11 @@ contract PerpEngine is Ownable, ReentrancyGuard {
 
     function unpause() external onlyOwner {
         isPaused = false;
+    }
+
+    function setFeeReceiver(address _receiver) external onlyOwner {
+        require(_receiver != address(0), "Invalid address");
+        feeReceiver = _receiver;
     }
 
     // Emergency function to close vault hedge (admin only)
