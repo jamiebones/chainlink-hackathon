@@ -1,4 +1,5 @@
 require("@nomicfoundation/hardhat-toolbox");
+require("@nomicfoundation/hardhat-verify"); // Add this for verification
 require("dotenv").config();
 
 // Private keys (replace defaults in .env for real deploys)
@@ -26,7 +27,7 @@ module.exports = {
         settings: {
           optimizer: {
             enabled: true,
-            runs: 200,
+            runs: 50,
           },
           viaIR: true,
         },
@@ -132,7 +133,6 @@ module.exports = {
     gasPrice: 21,
     coinmarketcap: process.env.COINMARKETCAP_API_KEY,
   },
-
   paths: {
     sources: "./contracts",
     tests: "./test",

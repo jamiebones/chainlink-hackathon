@@ -26,7 +26,7 @@ describe("PerpEngine - Fixed Test Suite", function () {
   };
 
   beforeEach(async function () {
-    [owner, trader1, trader2, vault, liquidator, lpProvider] = await ethers.getSigners();
+    [owner, trader1, trader2, vault, liquidator, lpProvider, feeReceiver] = await ethers.getSigners();
 
     // Deploy Mock USDC
     const MockERC20 = await ethers.getContractFactory("MockERC20");
@@ -54,7 +54,8 @@ describe("PerpEngine - Fixed Test Suite", function () {
       await mockUSDC.getAddress(),
       await liquidityPool.getAddress(),
       await mockChainlinkManager.getAddress(),
-      await mockVault.getAddress()
+      await mockVault.getAddress(),
+      feeReceiver.address
     );
     await perpEngine.waitForDeployment();
 
@@ -627,9 +628,10 @@ describe("PerpEngine - Fixed Test Suite", function () {
       // Even with severe price drop
       await mockChainlinkManager.setPrice(Asset.TSLA, toPrice("50"));
       await mockChainlinkManager.setDexPrice(Asset.TSLA, toPrice("50"));
-      
-      const isLiquidatable = await perpEngine.isLiquidatable(await mockVault.getAddress(), Asset.TSLA);
-      expect(isLiquidatable).to.equal(false);
+
+      await expect(
+        perpEngine.connect(liquidator).isLiquidatable(await mockVault.getAddress(), Asset.TSLA)
+      ).to.be.revertedWithCustomError(perpEngine, "NotLiquidatable");
     });
 
     it("Should liquidate position when funding fees deplete collateral", async function () {

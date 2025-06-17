@@ -10,29 +10,29 @@ import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.s
 /// @notice USDC pool that backs perpetual trades and synthetic asset redemptions.
 /// LPs deposit USDC, earn proportional fees, and hold LP tokens representing their share.
 /// This contract manages capital reservation, release, and fee distribution to LPs.
-contract LiquidityPool is Ownable, ReentrancyGuard, ERC20("Synthetic Equity Liquidity Pool", "SYEQ-LP") {
+contract LiquidityPool is Ownable, ReentrancyGuard, ERC20 {
     // --- Errors ---
-    error ZeroAmount();                   // Raised when trying to deposit or withdraw 0 tokens
-    error InsufficientLiquidity();        // Raised when not enough USDC is available for a withdrawal or reservation
-    error NotPerpMarket();                // Only authorized PerpMarket contract can call restricted functions
-    error NotVault();                     // Only authorized Vault contract can call restricted functions
-    error OverRelease();                  // Prevents releasing more USDC than reserved
-    error InsufficientLPBalance();        // LPs cannot withdraw more than they own
-    error InsufficientUSDC();             // LPs cannot deposit more USDC than they have
+    error ZeroAmount();                   
+    error InsufficientLiquidity();        
+    error NotPerpMarket();                
+    error NotVault();                     
+    error OverRelease();                  
+    error InsufficientLPBalance();        
+    error InsufficientUSDC();             
 
     // --- External Contracts ---
-    IERC20 public immutable usdc;         // USDC token (assumed 6 decimals)
+    IERC20 public immutable usdc;         
 
     // --- Liquidity Accounting ---
-    uint256 public totalLiquidity;        // Total USDC in the pool
-    uint256 public reservedLiquidity;     // USDC currently reserved for open trades or hedges
-    uint256 public totalFeesCollected;    // Accumulated fees to be distributed to LPs
-    uint256 public totalFeesClaimed;      // Already claimed fee amount by LPs
+    uint256 public totalLiquidity;        
+    uint256 public reservedLiquidity;     
+    uint256 public totalFeesCollected;    
+    uint256 public totalFeesClaimed;      
 
-    mapping(address => uint256) public userFeeCheckpoint; // Tracks last fee snapshot per LP
+    mapping(address => uint256) public userFeeCheckpoint; 
 
-    address public perpMarket;            // Address of the PerpMarket contract
-    address public vault;                 // Address of the Vault contract
+    address public perpMarket;            
+    address public vault;                 
 
     // --- Events ---
     event Deposited(address indexed user, uint256 usdcAmount, uint256 lpTokens);
@@ -55,8 +55,16 @@ contract LiquidityPool is Ownable, ReentrancyGuard, ERC20("Synthetic Equity Liqu
         _;
     }
 
-    constructor(address _usdc) Ownable(msg.sender) {
+    constructor(address _usdc) 
+        Ownable(msg.sender) 
+        ERC20("Synthetic Equity Liquidity Pool", "SYEQ-LP") 
+    {
         usdc = IERC20(_usdc);
+    }
+
+    /// @notice Override decimals to match USDC (6 decimals)
+    function decimals() public pure override returns (uint8) {
+        return 6;
     }
 
     function setPerpMarket(address _perp) external onlyOwner {
@@ -72,12 +80,17 @@ contract LiquidityPool is Ownable, ReentrancyGuard, ERC20("Synthetic Equity Liqu
         if (amount == 0) revert ZeroAmount();
         if (usdc.balanceOf(msg.sender) < amount) revert InsufficientUSDC();
 
-
-        uint256 lpAmount = totalSupply() == 0 ? amount : (amount * totalSupply()) / totalLiquidity;
-
+        uint256 pre = usdc.balanceOf(address(this));
         usdc.transferFrom(msg.sender, address(this), amount);
-        totalLiquidity += amount;
+        uint256 received = usdc.balanceOf(address(this)) - pre;
+        require(received > 0, "ZeroReceived");
+
+        uint256 lpAmount = totalSupply()==0 ? received
+                        : received * totalSupply() / totalLiquidity;
+        totalLiquidity += received;
+
         _mint(msg.sender, lpAmount);
+        _updateFeeCheckpoint(msg.sender);   
 
         emit Deposited(msg.sender, amount, lpAmount);
     }
@@ -101,13 +114,11 @@ contract LiquidityPool is Ownable, ReentrancyGuard, ERC20("Synthetic Equity Liqu
     }
 
     /// @notice Called by PerpMarket to reserve liquidity (e.g. margin backing)
-    /// Used when USDC is already in the pool and we are just reserving notional value.
     function reserve(uint256 amount) external onlyPerp {
         if (amount == 0) revert ZeroAmount();
         if (amount > availableLiquidity()) revert InsufficientLiquidity();
 
         reservedLiquidity += amount;
-        emit Reserved(amount);
     }
 
     /// @notice Called by PerpMarket to release liquidity back to a recipient or vault
@@ -162,13 +173,12 @@ contract LiquidityPool is Ownable, ReentrancyGuard, ERC20("Synthetic Equity Liqu
         uint256 share = (lpBalance * delta) / supply;
 
         if (share > 0) {
-            usdc.transfer(user, share);
             totalLiquidity -= share;
             totalFeesClaimed += share;
+            userFeeCheckpoint[user] = totalFeesCollected;
+            usdc.transfer(user, share);
             emit FeeClaimed(user, share);
         }
-
-        userFeeCheckpoint[user] = totalFeesCollected;
     }
 
     function _updateFeeCheckpoint(address user) internal {
@@ -179,7 +189,6 @@ contract LiquidityPool is Ownable, ReentrancyGuard, ERC20("Synthetic Equity Liqu
         }
     }
 
-    // Also override _update function to handle transfers:
     function _update(address from, address to, uint256 value) internal override {
         if (from != address(0)) _claimFees(from);
         if (to != address(0) && to != from) _updateFeeCheckpoint(to);

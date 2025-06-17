@@ -1,6 +1,8 @@
 const { ethers } = require("hardhat");
 const fs = require("fs");
 const path = require("path");
+require("dotenv").config();
+
 
 // Color codes for console output
 const colors = {
@@ -20,7 +22,7 @@ const CONFIG = {
   chainlinkSubscriptionId: 15598, // Update with your subscription ID
   
   // Initial liquidity amounts
-  initialLiquidityUSDC: ethers.parseUnits("100", 6), // 100 USDC
+  initialLiquidityUSDC: ethers.parseUnits("1000", 6), // 1000 USDC
   
   // Team addresses
   treasury: null, // Will use deployer if not set
@@ -37,11 +39,16 @@ const CONFIG = {
 async function main() {
   console.log(`${colors.cyan}🚀 Starting Synthetic Equity Protocol Deployment${colors.reset}\n`);
 
-  // Get signers
-  const signers = await ethers.getSigners();
-    const deployer    = signers[0];
-    const lpProvider  = signers[1] || deployer;
-    const feeReceiver = signers[2] || deployer;
+  if (!process.env.LP_PROVIDER_PRIVATE_KEY || !process.env.FEE_RECEIVER_PRIVATE_KEY) {
+    console.warn(`${colors.red}⚠️  One or more private keys are missing in .env — falling back to DEPLOYER key${colors.reset}`);
+  }
+
+  const deployer = new ethers.Wallet(process.env.DEPLOYER_PRIVATE_KEY, ethers.provider);
+  const lpProvider = new ethers.Wallet(process.env.LP_PROVIDER_PRIVATE_KEY || process.env.DEPLOYER_PRIVATE_KEY, ethers.provider);
+  const feeReceiver = new ethers.Wallet(process.env.FEE_RECEIVER_PRIVATE_KEY || process.env.DEPLOYER_PRIVATE_KEY, ethers.provider);
+
+  console.log(`${colors.yellow}📍 Network: ${network.name}${colors.reset}`);
+
   console.log(`${colors.yellow}📍 Deployer address: ${deployer.address}${colors.reset}`);
   console.log(`${colors.yellow}📍 LP Provider address: ${lpProvider.address}${colors.reset}`);
   console.log(`${colors.yellow}📍 Fee Receiver address: ${feeReceiver.address}${colors.reset}\n`);
@@ -144,7 +151,7 @@ async function main() {
       deployments.liquidityPool,
       deployments.chainlinkManager,
       deployments.vault,
-      deployer.address
+      feeReceiver.address
     );
     await perpEngine.waitForDeployment();
     deployments.perpEngine = await perpEngine.getAddress();
@@ -169,6 +176,49 @@ async function main() {
     deployments.sAPPL = await sAPPL.getAddress();
     console.log(`${colors.green}✅ sAPPL deployed at: ${deployments.sAPPL}${colors.reset}\n`);
 
+    console.log(`${colors.bright}4.5. Verifying Contract Deployments...${colors.reset}`);
+    
+    // Verify all contracts are properly deployed
+    const contracts = {
+      'USDC': deployments.usdc,
+      'LiquidityPool': deployments.liquidityPool,
+      'Vault': deployments.vault,
+      'PerpEngine': deployments.perpEngine,
+      'sTSLA': deployments.sTSLA,
+      'sAPPL': deployments.sAPPL,
+      'ChainlinkManager': deployments.chainlinkManager
+    };
+    
+    for (const [name, address] of Object.entries(contracts)) {
+      const code = await ethers.provider.getCode(address);
+      if (code === '0x') {
+        throw new Error(`${name} contract not deployed properly at ${address}`);
+      }
+      console.log(`✅ ${name}: ${address} (deployed)`);
+    }
+    
+    // Test contract interactions
+    console.log("\nTesting basic contract calls...");
+    
+    try {
+      // Test LiquidityPool methods exist
+      const liquidityPoolContract = await ethers.getContractAt("LiquidityPool", deployments.liquidityPool);
+      console.log("LiquidityPool contract instance created");
+      
+      // Test if the methods exist
+      const usdcAddress = await liquidityPoolContract.usdc();
+      console.log(`LiquidityPool.usdc(): ${usdcAddress}`);
+      
+      const totalLiq = await liquidityPoolContract.totalLiquidity();
+      console.log(`LiquidityPool.totalLiquidity(): ${totalLiq}`);
+      
+    } catch (testError) {
+      console.log(`${colors.red}❌ Contract interaction test failed:${colors.reset}`, testError);
+      throw testError;
+    }
+    
+    console.log(`${colors.green}✅ All contracts verified and functional${colors.reset}\n`);
+
     // ========================================
     // 5. Configure Permissions and Links
     // ========================================
@@ -180,28 +230,221 @@ async function main() {
     await sAPPL.setVault(deployments.vault);
     console.log(`${colors.green}✅ Synthetic tokens configured${colors.reset}`);
 
-    // Configure LiquidityPool
+    // Configure LiquidityPool with detailed debugging
     console.log("Configuring LiquidityPool...");
-    await liquidityPool.setPerpMarket(deployments.perpEngine);
-    await liquidityPool.setVault(deployments.vault);
-    console.log(`${colors.green}✅ LiquidityPool configured${colors.reset}`);
+    console.log(`About to set perpMarket to: ${deployments.perpEngine}`);
+    console.log(`About to set vault to: ${deployments.vault}`);
+    
+    // Check LiquidityPool before configuration
+    let perpMarketBefore = await liquidityPool.perpMarket();
+    let vaultBefore = await liquidityPool.vault();
+    console.log(`LiquidityPool perpMarket BEFORE: ${perpMarketBefore}`);
+    console.log(`LiquidityPool vault BEFORE: ${vaultBefore}`);
+    
+    try {
+      // Set perpMarket
+      console.log("Setting perpMarket...");
+      const setPerpTx = await liquidityPool.setPerpMarket(deployments.perpEngine);
+      await setPerpTx.wait();
+      console.log("setPerpMarket transaction completed");
+      
+      // Set vault
+      console.log("Setting vault...");
+      const setVaultTx = await liquidityPool.setVault(deployments.vault);
+      await setVaultTx.wait();
+      console.log("setVault transaction completed");
+      
+    } catch (configError) {
+      console.log(`${colors.red}❌ Configuration failed:${colors.reset}`, configError);
+      throw configError;
+    }
+    
+    // Check LiquidityPool after configuration
+    let perpMarketAfter = await liquidityPool.perpMarket();
+    let vaultAfter = await liquidityPool.vault();
+    console.log(`LiquidityPool perpMarket AFTER: ${perpMarketAfter}`);
+    console.log(`LiquidityPool vault AFTER: ${vaultAfter}`);
+    
+    // Verify the values were actually set
+    if (perpMarketAfter === ethers.ZeroAddress) {
+      throw new Error("setPerpMarket failed - still zero address");
+    }
+    if (vaultAfter === ethers.ZeroAddress) {
+      throw new Error("setVault failed - still zero address");
+    }
+    
+    console.log(`${colors.green}✅ LiquidityPool configured successfully${colors.reset}`);
 
     // Configure Vault
     console.log("Configuring Vault...");
-    await vault.setFeeReceiver(feeReceiver.address);
-    await vault.setPerpEngine(deployments.perpEngine);
-    await vault.startUpProtocol(
-      deployments.sTSLA,
-      deployments.sAPPL,
-      deployments.perpEngine
-    );
+    try {
+      await vault.setFeeReceiver(feeReceiver.address);
+      console.log("setFeeReceiver completed");
+      
+      await vault.setPerpEngine(deployments.perpEngine);
+      console.log("setPerpEngine completed");
+      
+      await vault.startUpProtocol(
+        deployments.sTSLA,
+        deployments.sAPPL,
+        deployments.perpEngine
+      );
+      console.log("startUpProtocol completed");
+      
+    } catch (vaultError) {
+      console.log(`${colors.red}❌ Vault configuration failed:${colors.reset}`, vaultError);
+      throw vaultError;
+    }
     console.log(`${colors.green}✅ Vault configured${colors.reset}`);
 
     // Configure PerpEngine
     console.log("Configuring PerpEngine...");
-    await perpEngine.setVaultAddress(deployments.vault);
+    try {
+      await perpEngine.setVaultAddress(deployments.vault);
+      console.log("setVaultAddress completed");
+    } catch (perpError) {
+      console.log(`${colors.red}❌ PerpEngine configuration failed:${colors.reset}`, perpError);
+      throw perpError;
+    }
     console.log(`${colors.green}✅ PerpEngine configured${colors.reset}\n`);
-  return deployments;
+    
+    // ========================================
+    // 6. Initialize Liquidity Pool
+    // ========================================
+    console.log(`${colors.bright}6. Initializing Liquidity Pool...${colors.reset}`);
+
+    // Verify LiquidityPool configuration
+    const perpMarketAddress = await liquidityPool.perpMarket();
+    const vaultAddress = await liquidityPool.vault();
+    console.log(`LiquidityPool perpMarket: ${perpMarketAddress}`);
+    console.log(`LiquidityPool vault: ${vaultAddress}`);
+
+    // Verify configuration is correct
+    if (perpMarketAddress === ethers.ZeroAddress) {
+      throw new Error("LiquidityPool perpMarket not set");
+    }
+    if (vaultAddress === ethers.ZeroAddress) {
+      throw new Error("LiquidityPool vault not set");
+    }
+
+    // Check LP Provider balance
+    const lpBalance = await usdc.balanceOf(lpProvider.address);
+    console.log(`LP Provider USDC balance: ${ethers.formatUnits(lpBalance, 6)} USDC`);
+    console.log(`Amount to deposit: ${ethers.formatUnits(CONFIG.initialLiquidityUSDC, 6)} USDC`);
+
+    if (lpBalance < CONFIG.initialLiquidityUSDC) {
+      throw new Error("Insufficient USDC balance for LP provider");
+    }
+
+    // Approve USDC spending
+    console.log("Approving USDC...");
+    const approvalTx = await usdc.connect(lpProvider).approve(
+      deployments.liquidityPool,
+      CONFIG.initialLiquidityUSDC
+    );
+    await approvalTx.wait();
+
+    // Verify approval
+    const allowance = await usdc.allowance(lpProvider.address, deployments.liquidityPool);
+    console.log(`Verified allowance: ${ethers.formatUnits(allowance, 6)} USDC`);
+
+    if (allowance < CONFIG.initialLiquidityUSDC) {
+      throw new Error(`Insufficient allowance: ${ethers.formatUnits(allowance, 6)} < ${ethers.formatUnits(CONFIG.initialLiquidityUSDC, 6)}`);
+    }
+
+    // Now attempt the deposit
+    console.log("Attempting deposit...");
+    try {
+      const depositTx = await liquidityPool.connect(lpProvider).deposit(CONFIG.initialLiquidityUSDC);
+      await depositTx.wait();
+      console.log(`${colors.green}✅ Successfully deposited ${ethers.formatUnits(CONFIG.initialLiquidityUSDC, 6)} USDC${colors.reset}\n`);
+    } catch (error) {
+      console.log(`${colors.red}❌ Deposit failed${colors.reset}`);
+      console.log("Error:", error.message);
+      
+      // Try static call for better error info
+      try {
+        await liquidityPool.connect(lpProvider).deposit.staticCall(CONFIG.initialLiquidityUSDC);
+      } catch (staticError) {
+        console.log("Static call error:", staticError.message);
+      }
+      throw error;
+    }
+
+    // ========================================
+    // 7. Initialize Oracle Prices (Mock for testing)
+    // ========================================
+    console.log(`${colors.bright}7. Setting Initial Oracle Prices (Mock)...${colors.reset}`);
+    
+    // For mainnet, you'd trigger actual oracle updates
+    // For testing, we'll use mock prices if available
+    if (process.env.NETWORK === "localhost" || process.env.NETWORK === "hardhat") {
+      console.log(`${colors.yellow}⚠️  Using mock prices for testing${colors.reset}`);
+      // If you have mock oracle contracts, set prices here
+      // await mockChainlinkManager.setPrice(0, ethers.parseUnits("450", 18)); // TSLA
+      // await mockChainlinkManager.setPrice(1, ethers.parseUnits("175", 18)); // AAPL
+    } else {
+      console.log(`${colors.yellow}⚠️  Remember to trigger oracle updates with Chainlink subscription${colors.reset}`);
+    }
+
+    // ========================================
+    // 8. Verify Configuration
+    // ========================================
+    console.log(`\n${colors.bright}8. Verifying Deployment...${colors.reset}`);
+    
+    // Check LiquidityPool state
+    const totalLiquidity = await liquidityPool.totalLiquidity();
+    const availableLiquidity = await liquidityPool.availableLiquidity();
+    console.log(`LiquidityPool - Total: ${ethers.formatUnits(totalLiquidity, 6)} USDC`);
+    console.log(`LiquidityPool - Available: ${ethers.formatUnits(availableLiquidity, 6)} USDC`);
+    
+    // Check Vault configuration
+    const vaultContract = await ethers.getContractAt("Vault", deployments.vault);
+    const isStarted = await vaultContract.isStarted();
+    console.log(`Vault - Started: ${isStarted}`);
+    
+    // ========================================
+    // 9. Save Deployment Addresses
+    // ========================================
+    console.log(`\n${colors.bright}9. Saving Deployment Info...${colors.reset}`);
+    
+    const deploymentInfo = {
+      network: network.name,
+      chainId: network.config.chainId,
+      deployer: deployer.address,
+      timestamp: new Date().toISOString(),
+      contracts: deployments,
+      configuration: {
+        initialLiquidityUSDC: CONFIG.initialLiquidityUSDC.toString(),
+        oracleWindowSize: CONFIG.oracleWindowSize,
+        feeReceiver: feeReceiver.address,
+        lpProvider: lpProvider.address
+      }
+    };
+
+    const deploymentPath = path.join(__dirname, `../deployments/${network.name}_deployment.json`);
+    fs.mkdirSync(path.dirname(deploymentPath), { recursive: true });
+    fs.writeFileSync(deploymentPath, JSON.stringify(deploymentInfo, null, 2));
+    
+    console.log(`${colors.green}✅ Deployment info saved to: ${deploymentPath}${colors.reset}`);
+
+    // ========================================
+    // 10. Summary
+    // ========================================
+    console.log(`\n${colors.cyan}${'='.repeat(50)}${colors.reset}`);
+    console.log(`${colors.bright}DEPLOYMENT SUCCESSFUL!${colors.reset}`);
+    console.log(`${colors.cyan}${'='.repeat(50)}${colors.reset}\n`);
+    
+    console.log(`${colors.bright}Key Addresses:${colors.reset}`);
+    console.log(`USDC: ${deployments.usdc}`);
+    console.log(`LiquidityPool: ${deployments.liquidityPool}`);
+    console.log(`Vault: ${deployments.vault}`);
+    console.log(`PerpEngine: ${deployments.perpEngine}`);
+    console.log(`sTSLA: ${deployments.sTSLA}`);
+    console.log(`sAPPL: ${deployments.sAPPL}`);
+    console.log(`ChainlinkManager: ${deployments.chainlinkManager}`);
+
+    return deployments;
 
   } catch (error) {
     console.error(`\n${colors.red}❌ Deployment failed:${colors.reset}`, error);
