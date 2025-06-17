@@ -345,7 +345,9 @@ contract Vault is ReentrancyGuard {
             redemptionFee = amountOfSharesInUSDC;
             amountToPayUser = 0;
         }
-
+        
+        //at this point the amount have been returned to the vault
+    
         // Check if the contract has enough USDC to pay the user
         uint256 vaultUSDCBalance = usdcContract.balanceOf(address(this));
         if (vaultUSDCBalance < amountToPayUser) {
@@ -353,14 +355,9 @@ contract Vault is ReentrancyGuard {
         }
 
         // Transfer USDC to the user
-        (bool success, bytes memory data) = address(usdcContract).call(
-            abi.encodeWithSelector(
-                usdcContract.transfer.selector,
-                msg.sender,
-                amountToPayUser
-            )
-        );
-        if (!success || (data.length != 0 && !abi.decode(data, (bool)))) {
+        (bool success ) = usdcContract.transfer(msg.sender, amountToPayUser);
+         
+        if (!success) {
             revert TransferofFundsFailed();
         }
 
@@ -680,7 +677,7 @@ contract Vault is ReentrancyGuard {
             revert PossibleAccountingErrorThree();
         }
 
-         console.log("vault.mintedAmount before: ", vault.mintedAmount);
+        console.log("vault.mintedAmount before: ", vault.mintedAmount);
         vault.mintedAmount -= tokenToRedeem;
         vault.bufferCollateral -= userOriginalBufferShare;
         vault.hedgedCollateral -= userHedgedShare;
@@ -731,14 +728,14 @@ contract Vault is ReentrancyGuard {
         //burn the token
         assetContract.burn(msg.sender, stockToRedeem);
 
-        uint256 currentChainlinkAssetPrice = getScaledChainlinkPrice(assetType);
-        uint256 totalAmount = (currentChainlinkAssetPrice * stockToRedeem) /
-            PRECISION;
-        uint256 amountToPayInUSDC = convert18ToUSDCDecimal(totalAmount);
+        // uint256 currentChainlinkAssetPrice = getScaledChainlinkPrice(assetType);
+        // uint256 totalAmount = (currentChainlinkAssetPrice * stockToRedeem) /
+        //     PRECISION;
+        // uint256 amountToPayInUSDC = convert18ToUSDCDecimal(totalAmount);
 
         uint256 amountFromPerp = perpEngineContract.closeVaultHedge(
             assetType,
-            amountToPayInUSDC
+            stockToRedeem
         );
 
         //reduce the globalBuffer with the balance (this is wrong)
