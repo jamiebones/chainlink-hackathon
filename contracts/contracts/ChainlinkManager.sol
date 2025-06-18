@@ -1,3 +1,4 @@
+//0x888B0fEd1063fdEa9d393c2501673e24A098f5a6
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
@@ -24,12 +25,12 @@ contract ChainlinkManager {
     }
 
     /// @dev Fetch latest price from Chainlink Data Feed
-    function getPrice(Utils.Asset assetType) external view returns (uint256) {
+    function getPrice(Utils.Asset assetType) public view returns (uint256) {
         
         if (assetType == Utils.Asset.TSLA) {
-           return tSLAOracleManager.getPriceTSLA() * 1e18; //18 decimals
+           return tSLAOracleManager.getPriceTSLA() * 1e16; //18 decimals
         } else if (assetType == Utils.Asset.APPL) {
-           return aAPLOracleManager.getPriceAAPL() * 1e18; //18 decimals 
+           return aAPLOracleManager.getPriceAAPL() * 1e16; //18 decimals 
         } else {
             revert InvalidAssetType();
         }
@@ -61,4 +62,8 @@ contract ChainlinkManager {
     function isMarketOpen() public view returns (bool){
         return marketStatusOracle.isMarketOpen();
     }
+
+    function getDexPrice(Utils.Asset asset) external view returns(uint256){
+        return getPrice(asset);
+    } 
 }

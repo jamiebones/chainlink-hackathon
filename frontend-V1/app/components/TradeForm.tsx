@@ -93,14 +93,13 @@ export default function TradeForm({
   }
 
   return (
-    <div className="bg-slate-900 border border-slate-700 rounded-xl overflow-hidden">
-      <div className="p-4 border-b border-slate-700 bg-slate-800/50">
+    <div className="bg-[#18181b]/90 border border-white/10 rounded-2xl overflow-hidden shadow-2xl backdrop-blur-md">
+      <div className="p-4 border-b border-white/10 bg-[#18181b]/80">
         <h2 className="text-lg font-semibold text-white">Trade</h2>
       </div>
-
       <div className="p-4 space-y-6">
         {/* Direction Toggle */}
-        <div className="flex bg-slate-800 rounded-lg p-1 mb-4">
+        <div className="flex bg-[#232329]/80 rounded-lg p-1 mb-4">
           {['long', 'short'].map((d) => (
             <button
               key={d}
@@ -143,7 +142,7 @@ export default function TradeForm({
             step="0.01"
             value={quantity}
             onChange={(e) => setQuantity(e.target.value)}
-            className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm"
+            className="w-full px-3 py-2  border border-white/10 rounded-lg text-white text-sm"
             placeholder="0.00"
           />
         </div>
@@ -152,7 +151,7 @@ export default function TradeForm({
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="text-sm font-medium text-slate-300">Leverage</label>
-            <span className="text-sm text-blue-400 font-medium">{leverage}x</span>
+            <span className="text-sm text-white font-medium">{leverage}x</span>
           </div>
           <input
             type="range"
@@ -161,7 +160,7 @@ export default function TradeForm({
             step="1"
             value={leverage}
             onChange={(e) => setLeverage(e.target.value)}
-            className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+            className="w-full h-2 bg-white rounded-lg appearance-none cursor-pointer"
           />
           <div className="flex justify-between text-xs text-slate-500 mt-1">
             <span>1x</span>
@@ -171,7 +170,7 @@ export default function TradeForm({
         </div>
 
         {/* Preview */}
-        <div className="bg-slate-800 rounded-lg p-3 space-y-2">
+        <div className="rounded-lg p-3 space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-slate-400">Entry Price</span>
             <span className="text-white">${ENTRY_PRICE}</span>
@@ -204,7 +203,7 @@ export default function TradeForm({
           disabled={isLoading || qty <= 0}
           className={`w-full py-3 rounded-lg font-medium text-sm transition-all duration-200 ${
             isLoading || qty <= 0
-              ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
+              ? ' text-slate-500 cursor-not-allowed'
               : direction === 'long'
               ? 'bg-green-500 text-white hover:bg-green-600'
               : 'bg-red-500 text-white hover:bg-red-600'

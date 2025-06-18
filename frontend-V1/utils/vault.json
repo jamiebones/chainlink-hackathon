@@ -1,0 +1,971 @@
+[
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_usdc",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "_admin",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "_chainlinkManager",
+				"type": "address"
+			}
+		],
+		"stateMutability": "nonpayable",
+		"type": "constructor"
+	},
+	{
+		"inputs": [],
+		"name": "AlreadyStarted",
+		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "enum Utils.Asset",
+				"name": "",
+				"type": "uint8"
+			}
+		],
+		"name": "CircuitBreakerActivatedForAsset",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DivisionByZero",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "FeeReceiverNotSet",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InSufficientGlobalBufferAmount",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InsufficientFundForPayout",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InsufficientTokenAmountSpecified",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InsufficientVaultDebt",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InvalidAmount",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InvalidAssetTypeUsed",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InvalidNumberOfShares",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InvalidPrice",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InvalidVaultID",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "MarketNotOpen",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "NotAdmin",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "NotPerpEngine",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "NotStarted",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "Paused",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "PossibleAccountingErrorOne",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "PossibleAccountingErrorThree",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "PossibleAccountingErrorTwo",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ReentrancyGuardReentrantCall",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "StocksToReddemLowerThanUserBalance",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TransferofFundsFailed",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "VaultAlreadyPaidOut",
+		"type": "error"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "enum Utils.Asset",
+				"name": "asset",
+				"type": "uint8"
+			},
+			{
+				"indexed": false,
+				"internalType": "int256",
+				"name": "delta",
+				"type": "int256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "date",
+				"type": "uint256"
+			}
+		],
+		"name": "FundingSettled",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "amountUSDC",
+				"type": "uint256"
+			}
+		],
+		"name": "MintFeeCollected",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "newPerp",
+				"type": "address"
+			}
+		],
+		"name": "PerpEngineUpdated",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "trader",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "burnedAmount",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "amountRefunded",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "redemtionFee",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "date",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "enum Utils.Asset",
+				"name": "assetType",
+				"type": "uint8"
+			}
+		],
+		"name": "PositionClosed",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "trader",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "mintedAmount",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "bufferCollateral",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "hedgedCollateral",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "entryPrice",
+				"type": "uint256"
+			},
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "positionId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "date",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "enum Utils.Asset",
+				"name": "assetType",
+				"type": "uint8"
+			}
+		],
+		"name": "PositionCreated",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "amountUSDC",
+				"type": "uint256"
+			}
+		],
+		"name": "RedemptionFeeCollected",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "trader",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "amountUSDC",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "enum Utils.Asset",
+				"name": "assetType",
+				"type": "uint8"
+			}
+		],
+		"name": "UserWithdrawal",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "trader",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "positionId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "enum Utils.Asset",
+				"name": "assetType",
+				"type": "uint8"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "burnedAmount",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "amountRefunded",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "redemtionFee",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "date",
+				"type": "uint256"
+			}
+		],
+		"name": "VaultClosed",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "trader",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "positionId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "enum Utils.Asset",
+				"name": "assetType",
+				"type": "uint8"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "mintedAmount",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "bufferCollateral",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "hedgedCollateral",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "entryPrice",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "date",
+				"type": "uint256"
+			}
+		],
+		"name": "VaultOpened",
+		"type": "event"
+	},
+	{
+		"inputs": [],
+		"name": "CHAINLINK_PRECISION",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "PERCENTAGE_COLLATERAL",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "PRECISION",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "USDC_PRECISION",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "dexPrice",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "oraclePrice",
+				"type": "uint256"
+			}
+		],
+		"name": "_calculateMintFee",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "pure",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "dexPrice",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "oraclePrice",
+				"type": "uint256"
+			}
+		],
+		"name": "_calculateRedeemFee",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "pure",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "admin",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "chainlinkManager",
+		"outputs": [
+			{
+				"internalType": "contract ChainlinkManager",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "value18",
+				"type": "uint256"
+			}
+		],
+		"name": "convert18ToUSDCDecimal",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "pure",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "token",
+				"type": "address"
+			}
+		],
+		"name": "emergencyWithdraw",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "feeReceiver",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "enum Utils.Asset",
+				"name": "asset",
+				"type": "uint8"
+			}
+		],
+		"name": "getScaledChainlinkPrice",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "enum Utils.Asset",
+				"name": "asset",
+				"type": "uint8"
+			}
+		],
+		"name": "getScaledTwapPrice",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "enum Utils.Asset",
+				"name": "",
+				"type": "uint8"
+			}
+		],
+		"name": "globalBufferUSDC",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "isStarted",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "enum Utils.Asset",
+				"name": "assetType",
+				"type": "uint8"
+			},
+			{
+				"internalType": "uint256",
+				"name": "numofShares",
+				"type": "uint256"
+			}
+		],
+		"name": "openPosition",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "perpEngine",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "perpEngineContract",
+		"outputs": [
+			{
+				"internalType": "contract PerpEngine",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "enum Utils.Asset",
+				"name": "assetType",
+				"type": "uint8"
+			},
+			{
+				"internalType": "uint256",
+				"name": "stockToRedeem",
+				"type": "uint256"
+			}
+		],
+		"name": "redeemStock",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "vaultID",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "portionToRedeem",
+				"type": "uint256"
+			}
+		],
+		"name": "redeemVault",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_receiver",
+				"type": "address"
+			}
+		],
+		"name": "setFeeReceiver",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_perp",
+				"type": "address"
+			}
+		],
+		"name": "setPerpEngine",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_sTSLA",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "_sAPPL",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "_perpEngine",
+				"type": "address"
+			}
+		],
+		"name": "startUpProtocol",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "enum Utils.Asset",
+				"name": "asset",
+				"type": "uint8"
+			},
+			{
+				"internalType": "int256",
+				"name": "fundingFee",
+				"type": "int256"
+			}
+		],
+		"name": "syncFundingPnL",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "enum Utils.Asset",
+				"name": "",
+				"type": "uint8"
+			}
+		],
+		"name": "totalUserBufferUSDC",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "enum Utils.Asset",
+				"name": "",
+				"type": "uint8"
+			}
+		],
+		"name": "totalVaultDebt",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"name": "userPositionCount",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "userPositions",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "trader",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "mintedAmount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "bufferCollateral",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "hedgedCollateral",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "entryPrice",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "positionIndex",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "timestamp",
+				"type": "uint256"
+			},
+			{
+				"internalType": "enum Utils.Asset",
+				"name": "assetType",
+				"type": "uint8"
+			},
+			{
+				"internalType": "bool",
+				"name": "paidOut",
+				"type": "bool"
+			},
+			{
+				"internalType": "bool",
+				"name": "isActive",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	}
+]

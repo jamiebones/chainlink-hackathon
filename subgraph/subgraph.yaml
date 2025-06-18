@@ -3,22 +3,44 @@ schema:
   file: ./schema.graphql
 dataSources:
   - kind: ethereum
-    name: Contract
-    network: mainnet
+    name: Vault
+    network: avalanche-testnet
     source:
-      address: "0x0000000000000000000000000000000000000000"
-      abi: Contract
-      startBlock: 0
+      address: "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6"
+      abi: Vault
+      startBlock: 12345678  # REPLACE WITH ACTUAL DEPLOYMENT BLOCK
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
       language: wasm/assemblyscript
       entities:
-        - ExampleEntity
+        - Vault
+        - Position
+        - Withdrawal
+        - FundingSettlement
+        - FeeCollection
+        - PerpEngineUpdate
+        - ProtocolMetric
       abis:
-        - name: Contract
-          file: ./abis/Contract.json
+        - name: Vault
+          file: ./abis/Vault.json
       eventHandlers:
-        - event: ExampleEvent(indexed address,uint256)
-          handler: handleExampleEvent
-      file: ./src/mapping.ts 
+        - event: VaultOpened(indexed address,uint256,uint8,uint256,uint256,uint256,uint256,uint256)
+          handler: handleVaultOpened
+        - event: VaultClosed(indexed address,uint256,uint8,uint256,uint256,uint256,uint256)
+          handler: handleVaultClosed
+        - event: UserWithdrawal(indexed address,uint256,uint8)
+          handler: handleUserWithdrawal
+        - event: PositionCreated(indexed address,uint256,uint256,uint256,uint256,indexed uint256,uint256,uint8)
+          handler: handlePositionCreated
+        - event: PositionClosed(indexed address,uint256,uint256,uint256,uint256,uint8)
+          handler: handlePositionClosed
+        - event: FundingSettled(indexed uint8,int256,uint256)
+          handler: handleFundingSettled
+        - event: MintFeeCollected(indexed address,uint256)
+          handler: handleMintFeeCollected
+        - event: RedemptionFeeCollected(indexed address,uint256)
+          handler: handleRedemptionFeeCollected
+        - event: PerpEngineUpdated(address)
+          handler: handlePerpEngineUpdated
+      file: ./src/mapping.ts
