@@ -1,42 +1,92 @@
 'use client'
-
+import { useAccount } from 'wagmi'
 import React, { useState } from 'react'
-
+import { parseUnits } from 'viem'
+import { useWriteContract } from 'wagmi'
+import abiJson from '@/abis/PerpEngine.json'
+import abiJson2 from '@/abis/MockERc20.json'
+const PerpEngineABI = abiJson.abi
+const usdcAbi = abiJson2.abi
 type Direction = 'long' | 'short'
+const ASSET_ENUM = {
+  TSLA: 0,
+  APPL: 1,
+}
 
-const ENTRY_PRICE = 185.25 // mock price
+const PRICE_MAP: Record<'TSLA' | 'APPL', number> = {
+  TSLA: 185.25,
+  APPL: 197.60,
+}
 
-export default function TradeForm() {
+export default function TradeForm({
+  symbol,
+  setSymbol
+}: {
+  symbol: 'TSLA' | 'APPL',
+  setSymbol: React.Dispatch<React.SetStateAction<'TSLA' | 'APPL'>>
+}) {
   const [direction, setDirection] = useState<Direction>('long')
   const [leverage, setLeverage] = useState('1')
   const [quantity, setQuantity] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-
+  const ENTRY_PRICE = PRICE_MAP[symbol]
   const qty = parseFloat(quantity || '0')
   const lev = parseFloat(leverage || '1')
   const positionSize = qty * ENTRY_PRICE
-  const collateralRequired = lev ? (positionSize / lev) : 0
+  const leverageFactor = Math.round(lev * 1e6);
+  const collateralRequired = positionSize * 1e6 / leverageFactor;
   const estimatedFee = positionSize * 0.001
   const liquidationPrice = lev ? (ENTRY_PRICE * (1 - 0.9 / lev)) : 0
 
+  const { writeContractAsync } = useWriteContract()
+  const { isConnected } = useAccount()
+  console.log('Collateral:', collateralRequired)
+  console.log('Size USD:', positionSize)
+  console.log('Expected Leverage:', positionSize / collateralRequired)
+
   const handleTrade = async () => {
-    if (qty <= 0) {
-      alert('Enter a valid TSLA quantity')
+    if (!isConnected) {
+      alert('Please connect your wallet first.')
       return
     }
 
-    setIsLoading(true)
+    if (qty <= 0) {
+      alert(`Enter a valid ${symbol} quantity`)
+      return
+    }
+    const OPEN_FEE_BPS = 10 // 10 bps = 0.1%
+    const openFee = (positionSize * OPEN_FEE_BPS) / 10000
+    const totalApproval = collateralRequired + openFee
+    
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      alert(
-        `Submitted ${direction.toUpperCase()} order\n` +
-        `TSLA Qty: ${qty}\nEntry: $${ENTRY_PRICE}\nLeverage: ${lev}x\n` +
-        `Paying: $${collateralRequired.toFixed(2)} USDC`
-      )
+      setIsLoading(true)
+      await writeContractAsync({
+        address: '0xDD655EC06411cA3468E641A974d66804414Cb2A2',
+        abi: usdcAbi,
+        functionName: 'approve',
+        args: [
+          '0xB9485C15cAF89Fb90be7CE14B336975F4FAE8D8f', // PerpEngine address
+          parseUnits(totalApproval.toString(), 6),
+        ],
+      })
+      await writeContractAsync({
+        address: '0xB9485C15cAF89Fb90be7CE14B336975F4FAE8D8f',
+        abi: PerpEngineABI,
+        functionName: 'openPosition',
+        args: [
+          ASSET_ENUM[symbol],
+          parseUnits(collateralRequired.toString(), 6),
+          parseUnits(positionSize.toString(), 6),
+          direction === 'long',
+        ],
+      })
+
+      alert('Trade submitted!')
       setQuantity('')
       setLeverage('1')
-    } catch {
-      alert('Failed. Try again.')
+    } catch (err) {
+      console.error(err)
+      alert('Transaction failed')
     } finally {
       setIsLoading(false)
     }
@@ -67,11 +117,16 @@ export default function TradeForm() {
           ))}
         </div>
 
-        {/* Market */}
+        {/* Market Dropdown */}
         <div>
           <label className="block text-sm font-medium text-slate-300 mb-2">Market</label>
-          <select className="w-full px-3 py-2  border border-white/10 rounded-lg text-white text-sm">
-            <option>TSLA / USD</option>
+          <select
+            value={symbol}
+            onChange={(e) => setSymbol(e.target.value as 'TSLA' | 'APPL')}
+            className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm"
+          >
+            <option value="TSLA">TSLA / USDC</option>
+            <option value="APPL">APPL / USDC</option>
           </select>
         </div>
 
@@ -79,7 +134,7 @@ export default function TradeForm() {
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="text-sm font-medium text-slate-300">Buy Amount</label>
-            <span className="text-xs text-slate-400">TSLA</span>
+            <span className="text-xs text-slate-400">{symbol}</span>
           </div>
           <input
             type="number"
@@ -121,7 +176,7 @@ export default function TradeForm() {
             <span className="text-white">${ENTRY_PRICE}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-slate-400">TSLA Quantity</span>
+            <span className="text-slate-400">{symbol} Quantity</span>
             <span className="text-white">{qty || '0.00'}</span>
           </div>
           <div className="flex justify-between text-sm">
@@ -159,7 +214,7 @@ export default function TradeForm() {
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
               Processing...
             </div>
-          ) : `${direction === 'long' ? 'Long' : 'Short'} TSLA`}
+          ) : `${direction === 'long' ? 'Long' : 'Short'} ${symbol}`}
         </button>
 
         {/* Risk warning */}
