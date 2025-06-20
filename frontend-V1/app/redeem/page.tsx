@@ -11,7 +11,7 @@ import {
 } from 'wagmi';
 import VaultABI from '../../utils/vault.json';
 
-const VAULT_ADDRESS = "0x22b56EE0564CEb64459385936846C9a443569Ef8"; // Change to your vault address
+const VAULT_ADDRESS = "0x57ebC3E9B1260Ac811a33c0C54fD3611eC627144"; // Change to your vault address
 
 const assetLabelToEnum = {
   sTSLA: 0, 
@@ -39,7 +39,7 @@ export default function RedeemStockPage() {
     status: simulationStatus
   } = useSimulateContract({
     address: VAULT_ADDRESS,
-    abi: VaultABI,
+    abi: VaultABI.abi,
     functionName: 'redeemStock',
     args: [
       assetLabelToEnum[assetType],

@@ -73,7 +73,7 @@ async function main() {
 
     // Mint USDC for testing
     console.log(`${colors.yellow}💵 Minting USDC for testing...${colors.reset}`);
-    await usdc.mint(deployer.address, ethers.parseUnits("10000000", 6)); // 10M to deployer
+    await usdc.mint(deployer.address, ethers.parseUnits("100000000000000", 6)); // 10M to deployer
     await usdc.mint(lpProvider.address, ethers.parseUnits("2000000", 6)); // 2M to LP provider
     console.log(`${colors.green}✅ USDC minted${colors.reset}\n`);
 
