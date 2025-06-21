@@ -2,20 +2,17 @@
 import { useAccount } from 'wagmi'
 import React, { useState } from 'react'
 import { parseUnits } from 'viem'
-import { useWriteContract } from 'wagmi'
+import { useWriteContract,useReadContract } from 'wagmi'
 import abiJson from '@/abis/PerpEngine.json'
 import abiJson2 from '@/abis/MockERc20.json'
 const PerpEngineABI = abiJson.abi
 const usdcAbi = abiJson2.abi
+const PerpAdd = '0xB9485C15cAF89Fb90be7CE14B336975F4FAE8D8f'
+const UsdcAdd = '0xDD655EC06411cA3468E641A974d66804414Cb2A2'
 type Direction = 'long' | 'short'
 const ASSET_ENUM = {
   TSLA: 0,
   APPL: 1,
-}
-
-const PRICE_MAP: Record<'TSLA' | 'APPL', number> = {
-  TSLA: 185.25,
-  APPL: 197.60,
 }
 
 export default function TradeForm({
@@ -29,7 +26,40 @@ export default function TradeForm({
   const [leverage, setLeverage] = useState('1')
   const [quantity, setQuantity] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const ENTRY_PRICE = PRICE_MAP[symbol]
+  // Fetch TSLA price from Chainlink Oracle
+  const tslaPriceData = useReadContract({
+    address: '0x671db3340e1f84257c263DBBd46bFE4D5ffA777E', // TSLAOracleManager
+    abi: [
+      {
+        "inputs": [],
+        "name": "getPriceTSLA",
+        "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+        "stateMutability": "view",
+        "type": "function"
+      }
+    ],
+    functionName: 'getPriceTSLA',
+    query: { refetchInterval: 1000 }
+  })
+  // Fetch AAPL price from Chainlink Oracle
+  const aaplPriceData = useReadContract({
+    address: '0xd91D3a89A24c305c8d8e6Fc34d19866a747496ba', // AAPLOracleManager
+    abi: [
+      {
+        "inputs": [],
+        "name": "getPriceAAPL",
+        "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+        "stateMutability": "view",
+        "type": "function"
+      }
+    ],
+    functionName: 'getPriceAAPL',
+    query: { refetchInterval: 1000 }
+  })
+
+  const rawPriceTSLA = tslaPriceData.data ? Number(tslaPriceData.data) / 100 : 0
+  const rawPriceAAPL = aaplPriceData.data ? Number(aaplPriceData.data)/ 100 : 0
+  const ENTRY_PRICE = symbol === 'TSLA' ? rawPriceTSLA : rawPriceAAPL
   const qty = parseFloat(quantity || '0')
   const lev = parseFloat(leverage || '1')
   const positionSize = qty * ENTRY_PRICE
@@ -39,57 +69,155 @@ export default function TradeForm({
   const liquidationPrice = lev ? (ENTRY_PRICE * (1 - 0.9 / lev)) : 0
 
   const { writeContractAsync } = useWriteContract()
-  const { isConnected } = useAccount()
-  console.log('Collateral:', collateralRequired)
-  console.log('Size USD:', positionSize)
-  console.log('Expected Leverage:', positionSize / collateralRequired)
+  const { address: userAddress, isConnected } = useAccount()
 
-  const handleTrade = async () => {
-    if (!isConnected) {
-      alert('Please connect your wallet first.')
-      return
-    }
+const positionData = useReadContract({
+  address: PerpAdd,
+  abi: PerpEngineABI,
+  functionName: 'getPosition',
+  args: [userAddress, ASSET_ENUM[symbol]],
+  query: {
+    refetchInterval: 3000,
+    enabled: isConnected,
+  },
+})
 
-    if (qty <= 0) {
-      alert(`Enter a valid ${symbol} quantity`)
-      return
-    }
-    const OPEN_FEE_BPS = 10 // 10 bps = 0.1%
-    const openFee = (positionSize * OPEN_FEE_BPS) / 10000
-    const totalApproval = collateralRequired + openFee
+const hasPosition = positionData.data && positionData.data[0] > 0n
+console.log("outside");
+console.log(hasPosition);
+
+const handleTrade = async () => {
+  if (!isConnected) {
+    alert('Please connect your wallet first.')
+    return
+  }
+
+  if (qty <= 0 || positionSize <= 0 || collateralRequired <= 0) {
+    alert(`Enter a valid ${symbol} quantity`)
+    return
+  }
+
+  const assetId = ASSET_ENUM[symbol]
+  const OPEN_FEE_BPS = 10
+  const openFee = (positionSize * OPEN_FEE_BPS) / 10000
+  const totalApproval = collateralRequired + openFee
+
+  try {
+    setIsLoading(true)
+
+    // Approve USDC
+    await writeContractAsync({
+      address: UsdcAdd,
+      abi: usdcAbi,
+      functionName: 'approve',
+      args: [
+        PerpAdd, // PerpEngine
+        parseUnits(totalApproval.toString(), 6),
+      ],
+    })
+
+    const isLong  = positionData?.[4] ?? true
+
     
-    try {
-      setIsLoading(true)
+
+    const hasPosition = positionData.data && positionData.data[0] > 0n
+    console.log(hasPosition);
+    // CASE 1: no position → openPosition
+    if (!hasPosition) {
       await writeContractAsync({
-        address: '0xDD655EC06411cA3468E641A974d66804414Cb2A2',
-        abi: usdcAbi,
-        functionName: 'approve',
-        args: [
-          '0xB9485C15cAF89Fb90be7CE14B336975F4FAE8D8f', // PerpEngine address
-          parseUnits(totalApproval.toString(), 6),
-        ],
-      })
-      await writeContractAsync({
-        address: '0xB9485C15cAF89Fb90be7CE14B336975F4FAE8D8f',
+        address: PerpAdd,
         abi: PerpEngineABI,
         functionName: 'openPosition',
         args: [
-          ASSET_ENUM[symbol],
+          assetId,
           parseUnits(collateralRequired.toString(), 6),
           parseUnits(positionSize.toString(), 6),
           direction === 'long',
         ],
       })
+    }
 
-      alert('Trade submitted!')
-      setQuantity('')
-      setLeverage('1')
+    // CASE 2: same direction → increase + addCollateral
+    else if (isLong === (direction === 'long')) {
+      await writeContractAsync({
+        address: PerpAdd,
+        abi: PerpEngineABI,
+        functionName: 'addCollateral',
+        args: [assetId, parseUnits(collateralRequired.toString(), 6)],
+      })
+      await writeContractAsync({
+        address: PerpAdd,
+        abi: PerpEngineABI,
+        functionName: 'increasePosition',
+        args: [
+          assetId,
+          parseUnits(positionSize.toString(), 6),
+        ],
+      })
+    }
+
+    // CASE 3: opposite direction → reduce + reduceCollateral
+    else {
+      await writeContractAsync({
+        address: PerpAdd,
+        abi: PerpEngineABI,
+        functionName: 'addCollateral',
+        args: [assetId, parseUnits(collateralRequired.toString(), 6)],
+      })
+      await writeContractAsync({
+        address: PerpAdd,
+        abi: PerpEngineABI,
+        functionName: 'reducePosition',
+        args: [
+          assetId,
+          parseUnits(positionSize.toString(), 6),
+        ],
+      })
+    }
+
+    alert('✅ Trade submitted')
+    setQuantity('')
+    setLeverage('1')
+  } catch (err) {
+    console.error(err)
+    alert('❌ Trade failed')
+  } finally {
+    setIsLoading(false)
+  }
+}
+
+  const handleClose = async () => {
+    if (!isConnected) {
+      alert('Please connect your wallet first.')
+      return
+    }
+  
+    try {
+      setIsLoading(true)
+      await writeContractAsync({
+        address: '0xB9485C15cAF89Fb90be7CE14B336975F4FAE8D8f', // PerpEngine address
+        abi: PerpEngineABI,
+        functionName: 'closePosition',
+        args: [ASSET_ENUM[symbol]],
+      })
+  
+      alert('✅ Position closed')
     } catch (err) {
       console.error(err)
-      alert('Transaction failed')
+      alert('❌ Failed to close position')
     } finally {
       setIsLoading(false)
     }
+  }
+  if (symbol === 'TSLA' && tslaPriceData.isLoading) {
+    return (
+      <div className="text-white text-center py-10">Loading TSLA price from Chainlink...</div>
+    )
+  }
+  if (symbol === 'APPL' && aaplPriceData.isLoading) {
+    return (
+      <div className="text-white text-center py-10">Loading APPL price from Chainlink...</div>
+    )
   }
 
   return (
@@ -216,6 +344,21 @@ export default function TradeForm({
             </div>
           ) : `${direction === 'long' ? 'Long' : 'Short'} ${symbol}`}
         </button>
+        {hasPosition && (
+  <button
+    onClick={handleClose}
+    disabled={isLoading}
+    className="w-full mt-3 py-3 rounded-lg font-medium text-sm bg-slate-700 text-white hover:bg-slate-600 transition-all duration-200"
+  >
+    {isLoading ? (
+      <div className="flex items-center justify-center">
+        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+        Closing...
+      </div>
+    ) : `Close ${symbol} Position`}
+  </button>
+)}
+
 
         {/* Risk warning */}
         <div className="p-3 bg-amber-900/20 border border-amber-800 rounded-lg text-xs text-amber-300 flex space-x-2">
