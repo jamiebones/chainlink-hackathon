@@ -28,9 +28,6 @@ export default function TradePage() {
                   <div className="w-2 h-2 bg-green-400 rounded-full"></div>
                   <span>Arbitrum</span>
                 </div>
-                <div className="px-3 py-1 bg-slate-800 rounded-lg text-sm text-slate-300">
-                  TSLA: $185.25
-                </div>
               </div>
             </div>
           </div>
@@ -46,6 +43,7 @@ export default function TradePage() {
         </div>
         <PositionTable />
       </div>
+    </div>
     </div>
   )
 }
