@@ -46,6 +46,8 @@ async function main() {
   const deployer = new ethers.Wallet(process.env.DEPLOYER_PRIVATE_KEY, ethers.provider);
   const lpProvider = new ethers.Wallet(process.env.LP_PROVIDER_PRIVATE_KEY || process.env.DEPLOYER_PRIVATE_KEY, ethers.provider);
   const feeReceiver = new ethers.Wallet(process.env.FEE_RECEIVER_PRIVATE_KEY || process.env.DEPLOYER_PRIVATE_KEY, ethers.provider);
+  // Needs update
+  const verifierAddress = "0x0000000000000000000000000000000000000000";
 
   console.log(`${colors.yellow}📍 Network: ${network.name}${colors.reset}`);
 
@@ -156,6 +158,12 @@ async function main() {
     await perpEngine.waitForDeployment();
     deployments.perpEngine = await perpEngine.getAddress();
     console.log(`${colors.green}✅ PerpEngine deployed at: ${deployments.perpEngine}${colors.reset}\n`);
+
+    const perpEngineZk = await ethers.getContractFactory("PerpEngineZk");
+    const perpEngineZkContract = await perpEngineZk.deploy(
+      verifierAddress,
+      perpEngine.address
+    )
 
     // ========================================
     // 4. Deploy Synthetic Assets
@@ -302,6 +310,8 @@ async function main() {
     try {
       await perpEngine.setVaultAddress(deployments.vault);
       console.log("setVaultAddress completed");
+      await perpEngine.setPerpEngineZk(perpEngineZkContract.address);
+      console.log("setPerpEngineZk completed");
     } catch (perpError) {
       console.log(`${colors.red}❌ PerpEngine configuration failed:${colors.reset}`, perpError);
       throw perpError;
