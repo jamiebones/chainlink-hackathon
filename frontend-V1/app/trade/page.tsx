@@ -4,10 +4,14 @@ import React, { useState } from 'react'
 import MarketChart from '../components/MarketChart'
 import TradeForm from '../components/TradeForm'
 import PositionTable from '../components/PositionTable'
+import { useRouter } from 'next/navigation'
 
 export default function TradePage() {
   const [symbol, setSymbol] = useState<'TSLA' | 'APPL'>('TSLA')
-
+  const router = useRouter()
+  const handlePrivate = () => {
+  router.push('/private')
+  }
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#111112] relative overflow-hidden">
       {/* Blurred colored balls for Uniswap-style background */}
@@ -25,8 +29,10 @@ export default function TradePage() {
               <h1 className="text-2xl font-bold text-white">Trade</h1>
               <div className="flex items-center space-x-4">
                 <div className="flex items-center space-x-2 text-sm text-slate-300">
+                  
+                  <button className="px-3 py-1 rounded-md bg-gray-800 text-white hover:bg-gray-700 transition" onClick={handlePrivate}>Private Mode</button>
                   <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                  <span>Arbitrum</span>
+                  <span>Avalanche</span>
                 </div>
               </div>
             </div>
