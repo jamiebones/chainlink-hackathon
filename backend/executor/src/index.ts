@@ -33,7 +33,7 @@ let recipientPubKey: CryptoKey;
     const pubKey = arrayBufferToBase64url(pubKeyBuf);
     const privKey = arrayBufferToBase64url(privKeyBuf);
     fs.writeFileSync('.hpke-secret', privKey);
-    fs.writeFileSync('../../frontend/public/hpke-key.txt', pubKey);
+    fs.writeFileSync('../../../frontend-V1/public-key/hpke-key.txt', pubKey);
     console.log('HPKE keypair generated & saved.');
 })();
 
