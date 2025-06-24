@@ -78,6 +78,7 @@ var core_1 = require("@hpke/core");
 var dhkem_x25519_1 = require("@hpke/dhkem-x25519");
 var chacha20poly1305_1 = require("@hpke/chacha20poly1305");
 var fs = __importStar(require("fs"));
+var ethers_1 = require("ethers");
 var suite = new core_1.CipherSuite({
     kem: new dhkem_x25519_1.DhkemX25519HkdfSha256(),
     kdf: new core_1.HkdfSha256(),
@@ -112,7 +113,7 @@ var recipientPubKey;
                 pubKey = arrayBufferToBase64url(pubKeyBuf);
                 privKey = arrayBufferToBase64url(privKeyBuf);
                 fs.writeFileSync('.hpke-secret', privKey);
-                fs.writeFileSync('../../../frontend-V1/public-key/hpke-key.txt', pubKey);
+                fs.writeFileSync('../../../frontend-V1/public/hpke-key.txt', pubKey);
                 console.log('HPKE keypair generated & saved.');
                 return [2 /*return*/];
         }
@@ -122,11 +123,11 @@ var app = (0, express_1.default)();
 app.use((0, cors_1.default)());
 app.use(express_1.default.json({ limit: '512kb' }));
 app.post('/submit', function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
-    var _a, enc, ctc, encBuf, encArrayBuffer, ctBuf, ctArrayBuffer, recipient, pt, e_1;
-    return __generator(this, function (_b) {
-        switch (_b.label) {
+    var _a, enc, ctc, encBuf, encArrayBuffer, ctBuf, ctArrayBuffer, recipient, pt, textFetched, _b, payload, sig, recovered, e_1;
+    return __generator(this, function (_c) {
+        switch (_c.label) {
             case 0:
-                _b.trys.push([0, 3, , 4]);
+                _c.trys.push([0, 3, , 4]);
                 console.log("the request is ", req.body);
                 _a = req.body, enc = _a.enc, ctc = _a.ctc;
                 console.log("enc is ", enc);
@@ -144,25 +145,23 @@ app.post('/submit', function (req, res) { return __awaiter(void 0, void 0, void 
                         enc: encArrayBuffer,
                     })];
             case 1:
-                recipient = _b.sent();
+                recipient = _c.sent();
                 return [4 /*yield*/, recipient.open(ctArrayBuffer)];
             case 2:
-                pt = _b.sent();
+                pt = _c.sent();
                 console.log(new TextDecoder().decode(pt));
-                // const pt = await recipient.open(ctBytes);
-                // const textFetched = new TextDecoder().decode(pt);
-                // console.log('Decrypted payload (JSON):', textFetched);
-                // Extract and verify signature
-                // const { payload, sig } = JSON.parse(textFetched);
-                // const recovered = verifyMessage(JSON.stringify(payload), sig);
-                // if (recovered.toLowerCase() !== payload.trader.toLowerCase()) {
-                //   throw new Error('bad signature');
-                // }
-                // console.log('✅ Burner wallet + HPKE worked! Trade:', payload);
+                textFetched = new TextDecoder().decode(pt);
+                console.log('Decrypted payload (JSON):', textFetched);
+                _b = JSON.parse(textFetched), payload = _b.payload, sig = _b.sig;
+                recovered = (0, ethers_1.verifyMessage)(JSON.stringify(payload), sig);
+                if (recovered.toLowerCase() !== payload.trader.toLowerCase()) {
+                    throw new Error('bad signature');
+                }
+                console.log('✅ Burner wallet + HPKE worked! Trade:', payload);
                 res.json({ ok: true });
                 return [3 /*break*/, 4];
             case 3:
-                e_1 = _b.sent();
+                e_1 = _c.sent();
                 console.error('❌ Error:', e_1);
                 res.status(400).json({ error: 'decrypt, parse, or sig failed' });
                 return [3 /*break*/, 4];
