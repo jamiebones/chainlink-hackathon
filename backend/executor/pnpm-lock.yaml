@@ -17,6 +17,9 @@ importers:
       '@hpke/dhkem-x25519':
         specifier: ^1.6.2
         version: 1.6.2
+      '@zk-kit/groth16':
+        specifier: ^0.5.0
+        version: 0.5.0
       '@zk-kit/incremental-merkle-tree':
         specifier: ^1.1.0
         version: 1.1.0
@@ -401,6 +404,9 @@ packages:
   '@types/snarkjs@0.7.9':
     resolution: {integrity: sha512-pb4Bq3GI2YQOQOG0dR/YuQs/mqcuL6k/vnz68LIPtpA2frrUL3twf69a3AUK9eUmNNeW0RIKkq6scDlC75Is+g==}
 
+  '@zk-kit/groth16@0.5.0':
+    resolution: {integrity: sha512-19hKaxuNi+sNARaUA5HuiNiBoN5jnh6DeScEMlrVgFirIrmsGsEPyC8J1oCvDbd4qww+OVNJEnw3gvOp6hYP5w==}
+
   '@zk-kit/incremental-merkle-tree@1.1.0':
     resolution: {integrity: sha512-WnNR/GQse3lX8zOHMU8zwhgX8u3qPoul8w4GjJ0WDHq+VGJimo7EGheRZ/ILeBQabnlzAerdv3vBqYBehBeoKA==}
 
@@ -599,6 +605,10 @@ packages:
   cipher-base@1.0.6:
     resolution: {integrity: sha512-3Ek9H3X6pj5TgenXYtNWdaBon1tgYCaebd+XPg0keyjEbEfkD4KkmAxkQ/i1vYvxdcT5nscLBfq9VJRmCBcFSw==}
     engines: {node: '>= 0.10'}
+
+  circom_runtime@0.1.24:
+    resolution: {integrity: sha512-H7/7I2J/cBmRnZm9docOCGhfxzS61BEm4TMCWcrZGsWNBQhePNfQq88Oj2XpUfzmBTCd8pRvRb3Mvazt3TMrJw==}
+    hasBin: true
 
   circom_runtime@0.1.28:
     resolution: {integrity: sha512-ACagpQ7zBRLKDl5xRZ4KpmYIcZDUjOiNRuxvXLqhnnlLSVY1Dbvh73TI853nqoR0oEbihtWmMSjgc5f+pXf/jQ==}
@@ -892,6 +902,12 @@ packages:
 
   fastfile@0.0.20:
     resolution: {integrity: sha512-r5ZDbgImvVWCP0lA/cGNgQcZqR+aYdFx3u+CtJqUE510pBUVGMn4ulL/iRTI4tACTYsNJ736uzFxEBXesPAktA==}
+
+  ffjavascript@0.2.60:
+    resolution: {integrity: sha512-T/9bnEL5xAZRDbQoEMf+pM9nrhK+C3JyZNmqiWub26EQorW7Jt+jR54gpqDhceA4Nj0YctPQwYnl8xa52/A26A==}
+
+  ffjavascript@0.2.62:
+    resolution: {integrity: sha512-uJ7MTrdzhX/3f+hxn0XhdXbJCqYZJSBB6y2/ui4t21vKYVjyTMlU80pPXu40ir6qpqbrdzUeKdlOdJ0aFG9UNA==}
 
   ffjavascript@0.2.63:
     resolution: {integrity: sha512-dBgdsfGks58b66JnUZeZpGxdMIDQ4QsD3VYlRJyFVrKQHb2kJy4R2gufx5oetrTxXPT+aEjg0dOvOLg1N0on4A==}
@@ -2477,6 +2493,11 @@ snapshots:
 
   '@types/snarkjs@0.7.9': {}
 
+  '@zk-kit/groth16@0.5.0':
+    dependencies:
+      circom_runtime: 0.1.24
+      ffjavascript: 0.2.62
+
   '@zk-kit/incremental-merkle-tree@1.1.0': {}
 
   abortcontroller-polyfill@1.7.8: {}
@@ -2699,6 +2720,10 @@ snapshots:
     dependencies:
       inherits: 2.0.4
       safe-buffer: 5.2.1
+
+  circom_runtime@0.1.24:
+    dependencies:
+      ffjavascript: 0.2.60
 
   circom_runtime@0.1.28:
     dependencies:
@@ -3124,6 +3149,18 @@ snapshots:
   fast-levenshtein@2.0.6: {}
 
   fastfile@0.0.20: {}
+
+  ffjavascript@0.2.60:
+    dependencies:
+      wasmbuilder: 0.0.16
+      wasmcurves: 0.2.2
+      web-worker: 1.2.0
+
+  ffjavascript@0.2.62:
+    dependencies:
+      wasmbuilder: 0.0.16
+      wasmcurves: 0.2.2
+      web-worker: 1.2.0
 
   ffjavascript@0.2.63:
     dependencies:

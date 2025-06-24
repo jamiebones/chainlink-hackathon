@@ -83,6 +83,25 @@ function usePrivateTradeHpke() {
   };
 }
 
+const handleProof = async () => {
+  await fetch('/api/proof', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    oldRoot: "8068729852621700367328332468602027432536331799177594994194018856225085146677...",
+    newRoot: "8068729852621700367328332468602027432536331799177594994194018856225085146677...",
+    size: "3",
+    margin: "-100",
+    entryFunding: "5",
+    cumFunding: "0",
+    pathElements: ["15215956860192754867003942406872706015577979927073229954434143459039467021244"],    // array of stringified bigints
+    pathIndices: ["0"],     // array of stringified ints
+  })
+})
+  .then(r => r.json())
+  .then(console.log)
+
+}
 export default function PrivatePage() {
   const sendTrade = usePrivateTradeHpke();
 
@@ -109,6 +128,13 @@ export default function PrivatePage() {
       >
         Send Private Order
       </button>
+
+       {/* <button
+        onClick={handleProof}
+        style={{ backgroundColor: '#FF007A', color: 'white', padding: '8px 16px', border: 'none', borderRadius: 4 }}
+      >
+        Get Proof
+      </button> */}
     </div>
   );
 }
