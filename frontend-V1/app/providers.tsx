@@ -11,6 +11,8 @@ import {arbitrum, arbitrumSepolia, avalanche, avalancheFuji} from 'wagmi/chains'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { ReactNode } from 'react';
+import { ApolloProvider } from '@apollo/client';
+import client from './lib/apolloClient'; 
 
 // ✅ Define custom Fuji (Avalanche C-Chain Testnet)
 export const fuji: Chain = {
@@ -52,13 +54,14 @@ export default function Providers({ children }: { children: ReactNode }) {
  
 
   return (
+    <ApolloProvider client={client}>
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider>
           <header className="w-full sticky top-0 z-50 bg-[#111112] border-b border-white/10 shadow-sm">
             <div className="max-w-7xl mx-auto flex justify-between items-center px-6 py-4">
               <div className="flex items-center gap-10">
-                <h1 className="text-2xl font-bold text-white tracking-tight">sTSLA Dashboard</h1>
+                <h1 className="text-2xl font-bold text-white tracking-tight">Synthetic Tokens Dashboard</h1>
                 <nav className="flex gap-6">
                   <a href="#" className="text-white/80 hover:text-white px-3 py-2 rounded transition-colors font-medium">Trade</a>
                   <a href="#" className="text-white/80 hover:text-white px-3 py-2 rounded transition-colors font-medium">Portfolio</a>
@@ -73,5 +76,6 @@ export default function Providers({ children }: { children: ReactNode }) {
         </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>
+    </ApolloProvider>
   );
 }

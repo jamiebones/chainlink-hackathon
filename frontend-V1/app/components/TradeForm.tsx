@@ -83,8 +83,6 @@ const positionData = useReadContract({
 })
 
 const hasPosition = positionData.data && positionData.data[0] > 0n
-console.log("outside");
-console.log(hasPosition);
 
 const handleTrade = async () => {
   if (!isConnected) {
@@ -121,7 +119,6 @@ const handleTrade = async () => {
     
 
     const hasPosition = positionData.data && positionData.data[0] > 0n
-    console.log(hasPosition);
     // CASE 1: no position → openPosition
     if (!hasPosition) {
       await writeContractAsync({
@@ -156,7 +153,7 @@ const handleTrade = async () => {
       })
     }
 
-    // CASE 3: opposite direction → reduce + reduceCollateral
+    // CASE 3: opposite direction → reduce + addCollateral
     else {
       await writeContractAsync({
         address: PerpAdd,
