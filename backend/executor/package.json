@@ -9,12 +9,14 @@
     "@hpke/chacha20poly1305": "^1.6.2",
     "@hpke/core": "^1.7.2",
     "@hpke/dhkem-x25519": "^1.6.2",
+    "@types/circomlibjs": "^0.1.6",
     "@zk-kit/incremental-merkle-tree": "^1.1.0",
     "circomlibjs": "^0.0.8",
     "cors": "^2.8.5",
     "ethers": "^6.13.1",
     "express": "^4.21.2",
     "incremental-merkle-tree": "^1.0.0",
+    "lowdb": "^7.0.1",
     "snarkjs": "^0.7.5"
   },
   "devDependencies": {

@@ -17,6 +17,9 @@ importers:
       '@hpke/dhkem-x25519':
         specifier: ^1.6.2
         version: 1.6.2
+      '@types/circomlibjs':
+        specifier: ^0.1.6
+        version: 0.1.6
       '@zk-kit/incremental-merkle-tree':
         specifier: ^1.1.0
         version: 1.1.0
@@ -35,6 +38,9 @@ importers:
       incremental-merkle-tree:
         specifier: ^1.0.0
         version: 1.0.0(bufferutil@4.0.9)(utf-8-validate@5.0.10)
+      lowdb:
+        specifier: ^7.0.1
+        version: 7.0.1
       snarkjs:
         specifier: ^0.7.5
         version: 0.7.5
@@ -340,6 +346,9 @@ packages:
 
   '@types/cacheable-request@6.0.3':
     resolution: {integrity: sha512-IQ3EbTzGxIigb1I3qPZc1rWJnH0BmSKv5QYTalEwweFvyBDLSAe24zP0le/hyi7ecGfZVlIVAg4BZqb8WBwKqw==}
+
+  '@types/circomlibjs@0.1.6':
+    resolution: {integrity: sha512-yF174bPDaiKgejlZzCSqKwZaqXhlxMcVEHrAtstFohwP05OjtvHXOdxO6HQeTg8WwIdgMg7MJb1WyWZdUCGlPQ==}
 
   '@types/connect@3.4.38':
     resolution: {integrity: sha512-K6uROf1LD88uDQqJCktA4yzL1YYAK6NgfsI0v/mTgyPKWsX1CnJ0XPSDhViejru1GcRkLWb8RlzFYJRqGUbaug==}
@@ -1151,6 +1160,10 @@ packages:
   logplease@1.2.15:
     resolution: {integrity: sha512-jLlHnlsPSJjpwUfcNyUxXCl33AYg2cHhIf9QhGL2T4iPT0XPB+xP1LRKFPgIg1M/sg9kAJvy94w9CzBNrfnstA==}
 
+  lowdb@7.0.1:
+    resolution: {integrity: sha512-neJAj8GwF0e8EpycYIDFqEPcx9Qz4GUho20jWFR7YiFeXzF1YMLdxB36PypcTSPMA+4+LvgyMacYhlr18Zlymw==}
+    engines: {node: '>=18'}
+
   lowercase-keys@2.0.0:
     resolution: {integrity: sha512-tqNXrS78oMOE73NMxK4EMLQsQowWf8jKooH9g7xPavRT706R6bkQJ6DY2Te7QukaZsulxa30wQ7bk0pm4XiHmA==}
     engines: {node: '>=8'}
@@ -1539,6 +1552,10 @@ packages:
   statuses@2.0.1:
     resolution: {integrity: sha512-RwNA9Z/7PrK06rYLIzFMlaF+l73iwpzsqRIFgbMLbTcLD6cOao82TaWefPXQvB2fOC4AjuYSEndS7N/mTCbkdQ==}
     engines: {node: '>= 0.8'}
+
+  steno@4.0.2:
+    resolution: {integrity: sha512-yhPIQXjrlt1xv7dyPQg2P17URmXbuM5pdGkpiMB3RenprfiBlvK415Lctfe0eshk90oA7/tNq7WEiMK8RSP39A==}
+    engines: {node: '>=18'}
 
   strict-uri-encode@1.1.0:
     resolution: {integrity: sha512-R3f198pcvnB+5IpnBlRkphuE9n46WyVl8I39W/ZUTZLz4nqSP/oLYUrcnJrw462Ds8he4YKMov2efsTIw1BDGQ==}
@@ -2401,6 +2418,8 @@ snapshots:
       '@types/keyv': 3.1.4
       '@types/node': 12.20.55
       '@types/responselike': 1.0.3
+
+  '@types/circomlibjs@0.1.6': {}
 
   '@types/connect@3.4.38':
     dependencies:
@@ -3444,6 +3463,10 @@ snapshots:
 
   logplease@1.2.15: {}
 
+  lowdb@7.0.1:
+    dependencies:
+      steno: 4.0.2
+
   lowercase-keys@2.0.0: {}
 
   lowercase-keys@3.0.0: {}
@@ -3877,6 +3900,8 @@ snapshots:
       escodegen: 1.14.3
 
   statuses@2.0.1: {}
+
+  steno@4.0.2: {}
 
   strict-uri-encode@1.1.0: {}
 

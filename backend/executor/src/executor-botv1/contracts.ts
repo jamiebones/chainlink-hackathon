@@ -1,13 +1,17 @@
 import { ethers, Contract } from 'ethers';
 import { PERP_ENGINE_ABI, PERP_ENGINE_ZK_ABI, CHAINLINK_MANAGER_ABI, LIQUIDITY_POOL_ABI, ERC20_ABI } from './abis';
 
+// ====================================================================
+// CONTRACT SETUP & INITIALIZATION
+// ====================================================================
+
 // Setup provider and contract instances
 const provider = new ethers.JsonRpcProvider(process.env.RPC_URL || 'http://localhost:8545');
 const privateKey = process.env.EXECUTOR_PRIVATE_KEY || '0x' + '1'.repeat(64);
 const signer = new ethers.Wallet(privateKey, provider);
 
 // Main PerpEngine contract
-export const perpZK = new Contract(
+export const perpEngine = new Contract(
   process.env.PERP_ENGINE_ADDRESS || '0x' + '0'.repeat(40),
   PERP_ENGINE_ABI,
   signer
@@ -50,7 +54,10 @@ export enum Asset {
   AMZN = 4
 }
 
-// Helper functions for contract interaction
+// ====================================================================
+// PRICE & MARKET DATA FUNCTIONS
+// ====================================================================
+
 export async function getCurrentPrice(assetId: number = 0): Promise<bigint> {
   try {
     const price = await chainlinkManager.getPrice(assetId);
@@ -73,11 +80,13 @@ export async function getDexPrice(assetId: number = 0): Promise<bigint> {
 
 export async function getCurrentFunding(assetId: number = 0): Promise<bigint> {
   try {
-    const rate = await perpZK.getFundingRate(assetId);
+    const rate = await perpEngine.getFundingRate(assetId);
     return BigInt(rate.toString());
   } catch (error) {
-    console.warn('Failed to fetch funding rate, using fallback');
-    return 100n * 10n ** 15n; // 0.1% fallback
+    console.warn('Failed to fetch funding rate, using mock');
+    // Mock funding rate that changes slowly over time
+    const hoursSinceEpoch = Math.floor(Date.now() / (1000 * 3600));
+    return BigInt(hoursSinceEpoch) * 100n * 10n ** 15n; // 0.1% per hour
   }
 }
 
@@ -90,9 +99,13 @@ export async function checkAssetPaused(assetId: number): Promise<boolean> {
   }
 }
 
+// ====================================================================
+// LIQUIDITY POOL FUNCTIONS
+// ====================================================================
+
 export async function getPoolUtilization(): Promise<bigint> {
   try {
-    const utilization = await perpZK.getPoolUtilization();
+    const utilization = await perpEngine.getPoolUtilization();
     return BigInt(utilization.toString());
   } catch (error) {
     console.warn('Failed to fetch pool utilization');
@@ -120,7 +133,10 @@ export async function getReservedLiquidity(): Promise<bigint> {
   }
 }
 
-// Position management helper functions
+// ====================================================================
+// POSITION MANAGEMENT FUNCTIONS
+// ====================================================================
+
 export async function getPosition(trader: string, assetId: number): Promise<{
   sizeUsd: bigint;
   collateral: bigint;
@@ -130,7 +146,7 @@ export async function getPosition(trader: string, assetId: number): Promise<{
   lastBorrowingUpdate: bigint;
 } | null> {
   try {
-    const position = await perpZK.getPosition(trader, assetId);
+    const position = await perpEngine.getPosition(trader, assetId);
     
     // Check if position exists (sizeUsd > 0)
     if (position.sizeUsd.toString() === '0') {
@@ -153,7 +169,7 @@ export async function getPosition(trader: string, assetId: number): Promise<{
 
 export async function getPositionPnL(trader: string, assetId: number): Promise<bigint> {
   try {
-    const pnl = await perpZK.getPnL(assetId, trader);
+    const pnl = await perpEngine.getPnL(assetId, trader);
     return BigInt(pnl.toString());
   } catch (error) {
     console.error(`Failed to fetch PnL for ${trader}, asset ${assetId}:`, error);
@@ -163,7 +179,7 @@ export async function getPositionPnL(trader: string, assetId: number): Promise<b
 
 export async function getCollateralRatio(trader: string, assetId: number): Promise<bigint> {
   try {
-    const ratio = await perpZK.getCollateralRatio(trader, assetId);
+    const ratio = await perpEngine.getCollateralRatio(trader, assetId);
     return BigInt(ratio.toString());
   } catch (error) {
     console.error(`Failed to fetch collateral ratio for ${trader}, asset ${assetId}:`, error);
@@ -173,7 +189,7 @@ export async function getCollateralRatio(trader: string, assetId: number): Promi
 
 export async function getLeverage(trader: string, assetId: number): Promise<bigint> {
   try {
-    const leverage = await perpZK.getLeverage(trader, assetId);
+    const leverage = await perpEngine.getLeverage(trader, assetId);
     return BigInt(leverage.toString());
   } catch (error) {
     console.error(`Failed to fetch leverage for ${trader}, asset ${assetId}:`, error);
@@ -183,7 +199,7 @@ export async function getLeverage(trader: string, assetId: number): Promise<bigi
 
 export async function getLiquidationPrice(trader: string, assetId: number): Promise<bigint> {
   try {
-    const price = await perpZK.getLiquidationPrice(trader, assetId);
+    const price = await perpEngine.getLiquidationPrice(trader, assetId);
     return BigInt(price.toString());
   } catch (error) {
     console.error(`Failed to fetch liquidation price for ${trader}, asset ${assetId}:`, error);
@@ -191,10 +207,13 @@ export async function getLiquidationPrice(trader: string, assetId: number): Prom
   }
 }
 
-// Market data helper functions
+// ====================================================================
+// OPEN INTEREST & MARKET DATA
+// ====================================================================
+
 export async function getOpenInterest(assetId: number): Promise<{ longUsd: bigint; shortUsd: bigint }> {
   try {
-    const [longUsd, shortUsd] = await perpZK.getOpenInterest(assetId);
+    const [longUsd, shortUsd] = await perpEngine.getOpenInterest(assetId);
     return {
       longUsd: BigInt(longUsd.toString()),
       shortUsd: BigInt(shortUsd.toString())
@@ -207,7 +226,7 @@ export async function getOpenInterest(assetId: number): Promise<{ longUsd: bigin
 
 export async function getLongOpenInterestTokens(assetId: number): Promise<bigint> {
   try {
-    const longTokens = await perpZK.getLongOI(assetId);
+    const longTokens = await perpEngine.getLongOI(assetId);
     return BigInt(longTokens.toString());
   } catch (error) {
     console.error(`Failed to fetch long OI tokens for asset ${assetId}:`, error);
@@ -215,7 +234,10 @@ export async function getLongOpenInterestTokens(assetId: number): Promise<bigint
   }
 }
 
-// Configuration helper functions
+// ====================================================================
+// CONTRACT CONFIGURATION
+// ====================================================================
+
 export async function getContractConfig(): Promise<{
   fundingRateSensitivity: bigint;
   minCollateralRatioBps: bigint;
@@ -237,14 +259,14 @@ export async function getContractConfig(): Promise<{
       borrowingRateAnnualBps,
       isPaused
     ] = await Promise.all([
-      perpZK.fundingRateSensitivity(),
-      perpZK.minCollateralRatioBps(),
-      perpZK.maxUtilizationBps(),
-      perpZK.openFeeBps(),
-      perpZK.closeFeeBps(),
-      perpZK.liquidationFeeBps(),
-      perpZK.borrowingRateAnnualBps(),
-      perpZK.isPaused()
+      perpEngine.fundingRateSensitivity(),
+      perpEngine.minCollateralRatioBps(),
+      perpEngine.maxUtilizationBps(),
+      perpEngine.openFeeBps(),
+      perpEngine.closeFeeBps(),
+      perpEngine.liquidationFeeBps(),
+      perpEngine.borrowingRateAnnualBps(),
+      perpEngine.isPaused()
     ]);
 
     return {
@@ -263,28 +285,9 @@ export async function getContractConfig(): Promise<{
   }
 }
 
-// Token management functions
-export async function approveToken(spender: string, amount: bigint): Promise<void> {
-  try {
-    const tx = await usdcToken.approve(spender, amount);
-    await tx.wait();
-    console.log(`💰 Approved ${amount} USDC for ${spender}`);
-  } catch (error) {
-    console.error('Failed to approve token:', error);
-    throw error;
-  }
-}
-
-export async function transferToken(to: string, amount: bigint): Promise<void> {
-  try {
-    const tx = await usdcToken.transfer(to, amount);
-    await tx.wait();
-    console.log(`💰 Transferred ${amount} USDC to ${to}`);
-  } catch (error) {
-    console.error('Failed to transfer token:', error);
-    throw error;
-  }
-}
+// ====================================================================
+// USDC TOKEN FUNCTIONS
+// ====================================================================
 
 export async function getTokenBalance(account: string): Promise<bigint> {
   try {
@@ -306,10 +309,122 @@ export async function getTokenAllowance(owner: string, spender: string): Promise
   }
 }
 
-// Liquidation functions
+export async function transferToken(to: string, amount: bigint): Promise<string> {
+  try {
+    const tx = await usdcToken.transfer(to, amount);
+    const receipt = await tx.wait();
+    console.log(`💰 Transferred ${formatUSDC(amount)} USDC to ${to}`);
+    return tx.hash;
+  } catch (error) {
+    console.error('Failed to transfer token:', error);
+    throw error;
+  }
+}
+
+export async function transferTokenFrom(from: string, to: string, amount: bigint): Promise<string> {
+  try {
+    const tx = await usdcToken.transferFrom(from, to, amount);
+    const receipt = await tx.wait();
+    console.log(`💰 Transferred ${formatUSDC(amount)} USDC from ${from} to ${to}`);
+    return tx.hash;
+  } catch (error) {
+    console.error('Failed to transfer token:', error);
+    throw error;
+  }
+}
+
+// ====================================================================
+// BATCH PROCESSING FOR PRIVACY LAYER
+// ====================================================================
+
+/**
+ * Submit batch to PerpEngineZK contract
+ * @param assetIds - Array of asset IDs
+ * @param oldRoots - Array of old merkle roots
+ * @param newRoots - Array of new merkle roots
+ * @param netDeltas - Array of net position deltas
+ * @param marginDeltas - Array of net margin deltas
+ * @returns Transaction hash
+ */
+export async function processBatch(
+  assetIds: number[],
+  oldRoots: string[],
+  newRoots: string[],
+  netDeltas: bigint[],
+  marginDeltas: bigint[]
+): Promise<string> {
+  try {
+    console.log('📤 Submitting batch to PerpEngineZK...');
+    console.log(`   Assets: [${assetIds.join(', ')}]`);
+    console.log(`   Net deltas: [${netDeltas.map(d => formatDelta(d)).join(', ')}]`);
+    console.log(`   Margin deltas: [${marginDeltas.map(d => formatUSDC(d)).join(', ')}]`);
+
+    const tx = await perpEngineZK.processBatch(
+      assetIds,
+      oldRoots,
+      newRoots,
+      netDeltas,
+      marginDeltas,
+      { gasLimit: 3_000_000 }
+    );
+
+    const receipt = await tx.wait();
+    
+    console.log(`✅ Batch processed successfully: ${tx.hash}`);
+    console.log(`⛽ Gas used: ${receipt.gasUsed.toString()}`);
+    
+    return tx.hash;
+
+  } catch (error) {
+    console.error('❌ Batch processing failed:', error);
+    throw new Error(`Batch processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Get current merkle root for an asset from PerpEngineZK
+ * @param assetId - Asset ID
+ * @returns Current merkle root
+ */
+export async function getCurrentMerkleRoot(assetId: number): Promise<string> {
+  try {
+    const root = await perpEngineZK.getCurrentRoot(assetId);
+    return root;
+  } catch (error) {
+    console.error(`Failed to fetch merkle root for asset ${assetId}:`, error);
+    return '0x' + '0'.repeat(64); // Return zero root on error
+  }
+}
+
+/**
+ * Initialize asset in PerpEngineZK with initial root
+ * @param assetId - Asset ID to initialize
+ * @param initialRoot - Initial merkle root
+ * @returns Transaction hash
+ */
+export async function initializeAsset(assetId: number, initialRoot: string): Promise<string> {
+  try {
+    console.log(`🌳 Initializing asset ${assetId} with root: ${initialRoot}`);
+    
+    const tx = await perpEngineZK.initializeAsset(assetId, initialRoot);
+    const receipt = await tx.wait();
+    
+    console.log(`✅ Asset ${assetId} initialized: ${tx.hash}`);
+    return tx.hash;
+
+  } catch (error) {
+    console.error(`Failed to initialize asset ${assetId}:`, error);
+    throw new Error(`Asset initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+// ====================================================================
+// LIQUIDATION FUNCTIONS
+// ====================================================================
+
 export async function isPositionLiquidatable(trader: string, assetId: number): Promise<boolean> {
   try {
-    return await perpZK.isLiquidatable(trader, assetId);
+    return await perpEngine.isLiquidatable(trader, assetId);
   } catch (error) {
     console.error(`Failed to check liquidation status for ${trader}, asset ${assetId}:`, error);
     return false;
@@ -318,7 +433,7 @@ export async function isPositionLiquidatable(trader: string, assetId: number): P
 
 export async function liquidatePosition(trader: string, assetId: number): Promise<string> {
   try {
-    const tx = await perpZK.liquidate(trader, assetId, { gasLimit: 600_000 });
+    const tx = await perpEngine.liquidate(trader, assetId, { gasLimit: 600_000 });
     const receipt = await tx.wait();
     console.log(`🔥 Liquidated ${trader} asset ${assetId}, gas used: ${receipt.gasUsed}`);
     return tx.hash;
@@ -328,68 +443,15 @@ export async function liquidatePosition(trader: string, assetId: number): Promis
   }
 }
 
-// Vault hedge functions (for vault integration)
-export async function openVaultHedge(assetId: number, hedgeAmount: bigint): Promise<string> {
-  try {
-    const tx = await perpZK.openVaultHedge(assetId, hedgeAmount, { gasLimit: 800_000 });
-    const receipt = await tx.wait();
-    console.log(`🛡️ Opened vault hedge for asset ${assetId}, amount: ${hedgeAmount}`);
-    return tx.hash;
-  } catch (error) {
-    console.error(`Failed to open vault hedge for asset ${assetId}:`, error);
-    throw error;
-  }
-}
+// ====================================================================
+// EVENT MONITORING
+// ====================================================================
 
-export async function closeVaultHedge(assetId: number, redeemAmount: bigint): Promise<{ txHash: string; actualReturn: bigint }> {
-  try {
-    const tx = await perpZK.closeVaultHedge(assetId, redeemAmount, { gasLimit: 800_000 });
-    const receipt = await tx.wait();
-    
-    // Parse the return value from logs or call static function
-    const actualReturn = 0n; // Would need to parse from transaction logs or use callStatic
-    
-    console.log(`🛡️ Closed vault hedge for asset ${assetId}, redeemed: ${redeemAmount}`);
-    return { txHash: tx.hash, actualReturn };
-  } catch (error) {
-    console.error(`Failed to close vault hedge for asset ${assetId}:`, error);
-    throw error;
-  }
-}
-
-export async function getVaultHedgePosition(assetId: number): Promise<{
-  sizeUsd: bigint;
-  collateral: bigint;
-  entryPrice: bigint;
-  currentPnL: bigint;
-  currentValue: bigint;
-  exists: boolean;
-} | null> {
-  try {
-    const position = await perpZK.getVaultHedgePosition(assetId);
-    
-    if (!position.exists) {
-      return null;
-    }
-    
-    return {
-      sizeUsd: BigInt(position.sizeUsd.toString()),
-      collateral: BigInt(position.collateral.toString()),
-      entryPrice: BigInt(position.entryPrice.toString()),
-      currentPnL: BigInt(position.currentPnL.toString()),
-      currentValue: BigInt(position.currentValue.toString()),
-      exists: position.exists
-    };
-  } catch (error) {
-    console.error(`Failed to fetch vault hedge position for asset ${assetId}:`, error);
-    return null;
-  }
-}
-
-// Event listeners for monitoring
 export function setupEventListeners(callback: (event: any) => void): void {
-  // Position events
-  perpZK.on('PositionOpened', (trader, asset, sizeUsd, collateralAmount, price, isLong, event) => {
+  console.log('👂 Setting up contract event listeners...');
+
+  // Position events from PerpEngine
+  perpEngine.on('PositionOpened', (trader, asset, sizeUsd, collateralAmount, price, isLong, event) => {
     callback({
       type: 'PositionOpened',
       trader,
@@ -403,7 +465,7 @@ export function setupEventListeners(callback: (event: any) => void): void {
     });
   });
 
-  perpZK.on('PositionClosed', (trader, asset, sizeUsd, netReturn, pnl, event) => {
+  perpEngine.on('PositionClosed', (trader, asset, sizeUsd, netReturn, pnl, event) => {
     callback({
       type: 'PositionClosed',
       trader,
@@ -416,55 +478,36 @@ export function setupEventListeners(callback: (event: any) => void): void {
     });
   });
 
-  perpZK.on('PositionLiquidated', (trader, asset, positionSize, penalty, event) => {
+  // Batch events from PerpEngineZK
+  perpEngineZK.on('BatchProcessed', (assetIds, netDeltas, marginDeltas, event) => {
     callback({
-      type: 'PositionLiquidated',
-      trader,
-      asset: Number(asset),
-      positionSize: BigInt(positionSize.toString()),
-      penalty: BigInt(penalty.toString()),
+      type: 'BatchProcessed',
+      assetIds: assetIds.map((id: any) => Number(id)),
+      netDeltas: netDeltas.map((delta: any) => BigInt(delta.toString())),
+      marginDeltas: marginDeltas.map((delta: any) => BigInt(delta.toString())),
       blockNumber: event.blockNumber,
       transactionHash: event.transactionHash
     });
   });
 
-  // Funding events
-  perpZK.on('FundingUpdated', (asset, hourlyFundingRate, newCumulativeFundingRate, event) => {
+  perpEngineZK.on('RootUpdated', (assetId, oldRoot, newRoot, event) => {
     callback({
-      type: 'FundingUpdated',
-      asset: Number(asset),
-      hourlyFundingRate: BigInt(hourlyFundingRate.toString()),
-      newCumulativeFundingRate: BigInt(newCumulativeFundingRate.toString()),
+      type: 'RootUpdated',
+      assetId: Number(assetId),
+      oldRoot,
+      newRoot,
       blockNumber: event.blockNumber,
       transactionHash: event.transactionHash
     });
   });
 
-  // Vault hedge events
-  perpZK.on('VaultHedgeOpened', (user, asset, amount, event) => {
-    callback({
-      type: 'VaultHedgeOpened',
-      user,
-      asset: Number(asset),
-      amount: BigInt(amount.toString()),
-      blockNumber: event.blockNumber,
-      transactionHash: event.transactionHash
-    });
-  });
-
-  perpZK.on('VaultHedgeClosed', (user, asset, amount, event) => {
-    callback({
-      type: 'VaultHedgeClosed',
-      user,
-      asset: Number(asset),
-      amount: BigInt(amount.toString()),
-      blockNumber: event.blockNumber,
-      transactionHash: event.transactionHash
-    });
-  });
+  console.log('✅ Event listeners set up successfully');
 }
 
-// Utility functions
+// ====================================================================
+// UTILITY FUNCTIONS
+// ====================================================================
+
 export function formatUSDC(amount: bigint): string {
   return (Number(amount) / 1e6).toLocaleString('en-US', {
     minimumFractionDigits: 2,
@@ -487,4 +530,11 @@ export function formatBps(bps: bigint): string {
   return (Number(bps) / 100).toFixed(2) + '%';
 }
 
+export function formatDelta(delta: bigint): string {
+  const abs = delta < 0n ? -delta : delta;
+  const sign = delta < 0n ? '-' : '+';
+  return `${sign}$${formatUSDC(abs)}`;
+}
+
+// Export provider and signer for advanced usage
 export { provider, signer };
