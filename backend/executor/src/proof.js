@@ -81,24 +81,36 @@ Object.defineProperty(exports, "__esModule", { value: true });
 var groth16_1 = require("@zk-kit/groth16");
 var path_1 = require("path");
 var promises_1 = require("fs/promises");
+var tree_1 = require("./tree");
 function generateAndVerifyProof() {
     return __awaiter(this, void 0, void 0, function () {
-        var fieldModulus, input, baseDir, wasmPath, zkeyPath, vkeyPath, _a, proof, publicSignals, vkeyData, verificationKey, verifyResult, error_1;
+        var fieldModulus, merkleRoot, input, baseDir, wasmPath, zkeyPath, vkeyPath, _a, proof, publicSignals, vkeyData, verificationKey, verifyResult, error_1;
         return __generator(this, function (_b) {
             switch (_b.label) {
                 case 0:
                     fieldModulus = BigInt("21888242871839275222246405745257275088548364400416034343698204186575808495617");
+                    merkleRoot = BigInt((0, tree_1.currentRoot)());
+                    console.log("Current Merkle Root:", merkleRoot.toString());
                     input = {
-                        oldRoot: "8068729852621700367328332468602027432536331799177594994194018856225085146677",
-                        newRoot: "8068729852621700367328332468602027432536331799177594994194018856225085146677",
+                        oldRoot: merkleRoot.toString(),
+                        newRoot: merkleRoot.toString(),
                         size: 3,
                         margin: (BigInt(-100) + fieldModulus).toString(),
                         entryFunding: 5,
-                        cumFunding: "0", // String for bigint safety
+                        cumFunding: 0,
                         pathElements: [
-                            "15215956860192754867003942406872706015577979927073229954434143459039467021244"
+                            "15215956860192754867003942406872706015577979927073229954434143459039467021244",
+                            "10767976081731991724067408705540702443536110808973284358838706009676048757543",
+                            "7423237065226347324353380772367382631490014989348495481811164164159255474657",
+                            "11286972368698509976183087595462810875513684078608517520839298933882497716792",
+                            "3607627140608796879659380071776844901612302623152076817094415224584923813162",
+                            "19712377064642672829441595136074946683621277828620209496774504837737984048981",
+                            "20775607673010627194014556968476266066927294572720319469184847051418138353016",
+                            "3396914609616007258851405644437304192397291162432396347162513310381425243293",
+                            "21551820661461729022865262380882070649935529853313286572328683688269863701601",
+                            "6573136701248752079028194407151022595060682063033565181951145966236778420039"
                         ],
-                        pathIndices: [0] // Number array
+                        pathIndices: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
                     };
                     baseDir = (0, path_1.resolve)(__dirname, "../../circuits-synth/outputs");
                     wasmPath = (0, path_1.resolve)(baseDir, "liquidate_js/liquidate.wasm");

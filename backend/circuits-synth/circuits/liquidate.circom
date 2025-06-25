@@ -3,37 +3,44 @@ include "poseidon.circom";
 include "comparators.circom";
 include "mux1.circom";
 
-// MERKLE INCLUSION FOR DEPTH-1 TREE (2 LEAVES)
-template MerkleInclusion1() {
+template MerkleInclusion10() {
     signal input leaf;
-    signal input pathElements[1];  // Only 1 sibling needed
-    signal input pathIndices[1];   // Only 1 index selector
+    signal input pathElements[10];
+    signal input pathIndices[10];
     signal input root;
     signal output outRoot;
 
-    component h = Poseidon(2);
-    component leftMux = Mux1();
-    component rightMux = Mux1();
+    signal cur[11];
+    cur[0] <== leaf;
 
-    // Select left input: leaf or sibling based on index
-    leftMux.c[0] <== leaf;
-    leftMux.c[1] <== pathElements[0];
-    leftMux.s <== pathIndices[0];
-    
-    // Select right input: sibling or leaf based on index
-    rightMux.c[0] <== pathElements[0];
-    rightMux.c[1] <== leaf;
-    rightMux.s <== pathIndices[0];
+    component h[10];
+    component leftMux[10];
+    component rightMux[10];
 
-    h.inputs[0] <== leftMux.out;
-    h.inputs[1] <== rightMux.out;
-    
-    outRoot <== h.out;
-    outRoot === root; // Verify computed root matches input
+    for (var i = 0; i < 10; i++) {
+        h[i] = Poseidon(2);
+        leftMux[i] = Mux1();
+        rightMux[i] = Mux1();
+
+        leftMux[i].c[0] <== cur[i];
+        leftMux[i].c[1] <== pathElements[i];
+        leftMux[i].s <== pathIndices[i];
+
+        rightMux[i].c[0] <== pathElements[i];
+        rightMux[i].c[1] <== cur[i];
+        rightMux[i].s <== pathIndices[i];
+
+        h[i].inputs[0] <== leftMux[i].out;
+        h[i].inputs[1] <== rightMux[i].out;
+        cur[i+1] <== h[i].out;
+    }
+
+    outRoot <== cur[10];
+    outRoot === root;
 }
 
-template Liquidate3() {
-    // Public inputs
+// Your Liquidate circuit (example)
+template Liquidate10() {
     signal input oldRoot;
     signal input newRoot;
     signal input size;
@@ -41,36 +48,34 @@ template Liquidate3() {
     signal input entryFunding;
     signal input cumFunding;
     signal output isLiquidated;
-    // Private path (now depth-1)
-    signal input pathElements[1];  // Reduced to 1 element
-    signal input pathIndices[1];   // Reduced to 1 index
 
-    // Compute leaf hash
+    signal input pathElements[10];
+    signal input pathIndices[10];
+
     component leafH = Poseidon(3);
     leafH.inputs[0] <== size;
     leafH.inputs[1] <== margin;
     leafH.inputs[2] <== entryFunding;
 
-    // Merkle inclusion proof (depth-1)
-    component merkle = MerkleInclusion1();
+    component merkle = MerkleInclusion10();
     merkle.leaf <== leafH.out;
     merkle.root <== oldRoot;
-    merkle.pathElements[0] <== pathElements[0];
-    merkle.pathIndices[0] <== pathIndices[0];
-    log("The Root hash calculated by circuit is: ", merkle.outRoot);
-    merkle.outRoot === oldRoot; 
+    for (var i = 0; i < 10; i++) {
+        merkle.pathElements[i] <== pathElements[i];
+        merkle.pathIndices[i] <== pathIndices[i];
+    }
+    merkle.outRoot === oldRoot;
 
-    signal pnl; 
+    signal pnl;
     pnl <== (cumFunding - entryFunding) * size;
-    signal adjMargin; 
+    signal adjMargin;
     adjMargin <== margin + pnl;
-    log("The adjusted margin is: ", adjMargin);
 
     component lt = LessThan(64);
     lt.in[0] <== adjMargin;
     lt.in[1] <== 0;
-    isLiquidated <== lt.out ; // Require adjMargin < 0
-    newRoot === oldRoot; 
+    isLiquidated <== lt.out;
+    newRoot === oldRoot;
 }
 
-component main = Liquidate3();
+component main = Liquidate10();
