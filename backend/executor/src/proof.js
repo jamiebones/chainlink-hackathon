@@ -80,51 +80,58 @@ Object.defineProperty(exports, "__esModule", { value: true });
 // proof.ts
 var groth16_1 = require("@zk-kit/groth16");
 var path_1 = require("path");
-function generateProof() {
+var promises_1 = require("fs/promises");
+function generateAndVerifyProof() {
     return __awaiter(this, void 0, void 0, function () {
-        var input, wasmPath, zkeyPath, _a, proof, publicSignals, error_1;
+        var fieldModulus, input, baseDir, wasmPath, zkeyPath, vkeyPath, _a, proof, publicSignals, vkeyData, verificationKey, verifyResult, error_1;
         return __generator(this, function (_b) {
             switch (_b.label) {
                 case 0:
+                    fieldModulus = BigInt("21888242871839275222246405745257275088548364400416034343698204186575808495617");
                     input = {
-                        "oldRoot": "8068729852621700367328332468602027432536331799177594994194018856225085146677",
-                        "newRoot": "8068729852621700367328332468602027432536331799177594994194018856225085146677",
-                        "size": "3",
-                        "margin": "-100",
-                        "entryFunding": "5",
-                        "cumFunding": "0",
-                        "pathElements": [
+                        oldRoot: "8068729852621700367328332468602027432536331799177594994194018856225085146677",
+                        newRoot: "8068729852621700367328332468602027432536331799177594994194018856225085146677",
+                        size: 3,
+                        margin: (BigInt(-100) + fieldModulus).toString(),
+                        entryFunding: 5,
+                        cumFunding: "0", // String for bigint safety
+                        pathElements: [
                             "15215956860192754867003942406872706015577979927073229954434143459039467021244"
                         ],
-                        "pathIndices": ["0"]
+                        pathIndices: [0] // Number array
                     };
-                    wasmPath = (0, path_1.resolve)(__dirname, "../../circuits-synth/outputs/liquidate_js/liquidate.wasm");
-                    zkeyPath = (0, path_1.resolve)(__dirname, "../../circuits-synth/outputs/liquidate_final.zkey");
+                    baseDir = (0, path_1.resolve)(__dirname, "../../circuits-synth/outputs");
+                    wasmPath = (0, path_1.resolve)(baseDir, "liquidate_js/liquidate.wasm");
+                    zkeyPath = (0, path_1.resolve)(baseDir, "liquidate_final.zkey");
+                    vkeyPath = (0, path_1.resolve)(baseDir, "verification_key.json");
                     _b.label = 1;
                 case 1:
-                    _b.trys.push([1, 3, , 4]);
+                    _b.trys.push([1, 5, , 6]);
                     return [4 /*yield*/, (0, groth16_1.prove)(input, wasmPath, zkeyPath)];
                 case 2:
                     _a = _b.sent(), proof = _a.proof, publicSignals = _a.publicSignals;
-                    console.log(JSON.stringify({
-                        proof: {
-                            pi_a: proof.pi_a,
-                            pi_b: proof.pi_b,
-                            pi_c: proof.pi_c,
-                            protocol: proof.protocol,
-                            curve: proof.curve
-                        },
-                        publicSignals: publicSignals
-                    }, null, 2));
-                    return [3 /*break*/, 4];
+                    console.log("Generated Proof:", JSON.stringify(proof, null, 2));
+                    console.log("Public Signals:", publicSignals);
+                    return [4 /*yield*/, (0, promises_1.readFile)(vkeyPath, "utf-8")];
                 case 3:
+                    vkeyData = _b.sent();
+                    verificationKey = JSON.parse(vkeyData);
+                    return [4 /*yield*/, (0, groth16_1.verify)(verificationKey, {
+                            proof: proof,
+                            publicSignals: publicSignals
+                        })];
+                case 4:
+                    verifyResult = _b.sent();
+                    console.log("Verification Result:", verifyResult);
+                    return [2 /*return*/, verifyResult];
+                case 5:
                     error_1 = _b.sent();
-                    console.error("Proof generation failed:", error_1);
+                    console.error("Proof operation failed:", error_1 instanceof Error ? error_1.message : error_1);
                     process.exit(1);
-                    return [3 /*break*/, 4];
-                case 4: return [2 /*return*/];
+                    return [3 /*break*/, 6];
+                case 6: return [2 /*return*/];
             }
         });
     });
 }
-generateProof();
+generateAndVerifyProof();

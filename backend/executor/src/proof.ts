@@ -46,45 +46,71 @@
 
 // proof.ts
 
-import { prove } from "@zk-kit/groth16";
+import { prove, verify } from "@zk-kit/groth16";
 import { resolve } from "path";
+import { readFile } from "fs/promises";
+import {perpEngineZkContract} from './contracts'
+async function generateAndVerifyProof() {
+  // Field modulus conversion
+  const fieldModulus = BigInt("21888242871839275222246405745257275088548364400416034343698204186575808495617");
 
-async function generateProof() {
-  // Hardcoded input values
+  // Input data with explicit types
   const input = {
-  "oldRoot": "8068729852621700367328332468602027432536331799177594994194018856225085146677",
-  "newRoot": "8068729852621700367328332468602027432536331799177594994194018856225085146677",
-  "size": "3",         
-  "margin": "-100",
-  "entryFunding": "5",
-  "cumFunding": "0",
-  "pathElements": [
-    "15215956860192754867003942406872706015577979927073229954434143459039467021244"
-  ],
-  "pathIndices": ["0"]
-}
+    oldRoot: "8068729852621700367328332468602027432536331799177594994194018856225085146677",
+    newRoot: "8068729852621700367328332468602027432536331799177594994194018856225085146677",
+    size: 3,
+    margin: (BigInt(-100) + fieldModulus).toString(),
+    entryFunding: 5,
+    cumFunding: "0",  // String for bigint safety
+    pathElements: [
+      "15215956860192754867003942406872706015577979927073229954434143459039467021244"
+    ],
+    pathIndices: [0]  // Number array
+  };
 
-  // Resolve circuit paths (adjust based on your project structure)
-  const wasmPath = resolve(__dirname, "../../circuits-synth/outputs/liquidate_js/liquidate.wasm");
-  const zkeyPath = resolve(__dirname, "../../circuits-synth/outputs/liquidate_final.zkey");
+  // Resolve paths with type safety
+  const baseDir = resolve(__dirname, "../../circuits-synth/outputs");
+  const wasmPath = resolve(baseDir, "liquidate_js/liquidate.wasm");
+  const zkeyPath = resolve(baseDir, "liquidate_final.zkey");
+  const vkeyPath = resolve(baseDir, "verification_key.json");
 
   try {
-    const { proof, publicSignals } = await prove(input, wasmPath,zkeyPath);
+    // 1. Generate proof
+    const { proof, publicSignals } = await prove(input, wasmPath, zkeyPath);
     
-    console.log(JSON.stringify({
-      proof: {
-        pi_a: proof.pi_a,
-        pi_b: proof.pi_b,
-        pi_c: proof.pi_c,
-        protocol: proof.protocol,
-        curve: proof.curve
-      },
+    console.log("Generated Proof:", JSON.stringify(proof, null, 2));
+    console.log("Public Signals:", publicSignals);
+
+    // 2. Load verification key with proper typing
+    const vkeyData = await readFile(vkeyPath, "utf-8");
+    const verificationKey: Groth16VerificationKey = JSON.parse(vkeyData);
+    
+    // 3. Verify proof with correct structure
+    const verifyResult = await verify(verificationKey, {
+      proof,
       publicSignals
-    }, null, 2));
+    });
+    
+    console.log("Verification Result:", verifyResult);
+    return verifyResult;
+    
   } catch (error) {
-    console.error("Proof generation failed:", error);
+    console.error("Proof operation failed:", error instanceof Error ? error.message : error);
     process.exit(1);
   }
 }
 
-generateProof();
+// Type definitions for verification key
+interface Groth16VerificationKey {
+  protocol: "groth16";
+  curve: "bn128" | "bls12-381";
+  nPublic: number;
+  vk_alpha_1: [string, string, string];
+  vk_beta_2: [[string, string], [string, string], [string, string]];
+  vk_gamma_2: [[string, string], [string, string], [string, string]];
+  vk_delta_2: [[string, string], [string, string], [string, string]];
+  vk_alphabeta_12: unknown; // Not used in verification
+  IC: [string, string][];
+}
+
+generateAndVerifyProof();
