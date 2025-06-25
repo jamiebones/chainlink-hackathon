@@ -146,7 +146,7 @@ export function handleFundingSettled(event: FundingSettled): void {
   );
   
   settlement.asset = event.params.asset == 0 ? "TSLA" : "APPL";
-  settlement.delta = BigInt.fromI32(event.params.delta);
+  settlement.delta = event.params.delta;
   settlement.date = event.params.date;
   
   settlement.save();

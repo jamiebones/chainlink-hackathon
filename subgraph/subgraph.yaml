@@ -4,11 +4,11 @@ schema:
 dataSources:
   - kind: ethereum
     name: Vault
-    network: avalanche-testnet
+    network: fuji
     source:
-      address: "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6"
+      address: "0x999927B5EBb9B70Fa65Eba728f319C7C609530F4"
       abi: Vault
-      startBlock: 12345678  # REPLACE WITH ACTUAL DEPLOYMENT BLOCK
+      startBlock: 41989204  # REPLACE WITH ACTUAL DEPLOYMENT BLOCK
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7

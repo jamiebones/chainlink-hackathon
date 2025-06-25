@@ -16,13 +16,34 @@ const colors = {
 
 const { router, donId, gasLimit } = network.config;
 
+const usdcAbi = [
+  "function name() view returns (string)",
+  "function symbol() view returns (string)",
+  "function decimals() view returns (uint8)",
+  "function balanceOf(address account) view returns (uint256)",
+  "function transfer(address to, uint256 amount) returns (bool)",
+  "function approve(address spender, uint256 amount) returns (bool)",
+  "function allowance(address owner, address spender) view returns (uint256)"
+];
+const sourceChainSelector = 16015286601757825753n
+const avalanceFujiRouterContractAddress = "0xF694E193200268f9a4868e4Aa017A0118C9a8177";
+const usdcAddressAvalancheFuji = "0x5425890298aed601595a70AB815c96711a31Bc65"
+
+const provider = new ethers.JsonRpcProvider(`https://avalanche-fuji.infura.io/v3/${process.env.INFURA_API_KEY}`);
+const usdcContract = new ethers.Contract(usdcAddressAvalancheFuji, usdcAbi, provider);
+
+const avalancheFujiRouter = "0xA9d587a00A31A52Ed70D6026794a8FC5E2F5dCb0";
+const avalancheFujiDonID = "0x66756e2d6176616c616e6368652d66756a692d31000000000000000000000000";
+
+;
+//router address on Avalanche Fuji: 0xf694e193200268f9a4868e4aa017a0118c9a8177
 // Deployment configuration
 const CONFIG = {
   // Chainlink subscription IDs (update for your network)
   chainlinkSubscriptionId: 15598, // Update with your subscription ID
   
   // Initial liquidity amounts
-  initialLiquidityUSDC: ethers.parseUnits("100000000000", 6), // 100000000000 USDC
+  initialLiquidityUSDC: ethers.parseUnits("2", 6), // 100000000000 USDC
   
   // Team addresses
   treasury: null, // Will use deployer if not set
@@ -61,30 +82,20 @@ async function main() {
   const deployments = {};
 
   try {
-    // ========================================
-    // 1. Deploy Mock USDC (for testnet)
-    // ========================================
-    console.log(`${colors.bright}1. Deploying USDC...${colors.reset}`);
-    const MockUSDC = await ethers.getContractFactory("MockERC20");
-    const usdc = await MockUSDC.deploy("USD Coin", "USDC", 6);
-    await usdc.waitForDeployment();
-    deployments.usdc = await usdc.getAddress();
-    console.log(`${colors.green}✅ USDC deployed at: ${deployments.usdc}${colors.reset}\n`);
-
-    // Mint USDC for testing
-    console.log(`${colors.yellow}💵 Minting USDC for testing...${colors.reset}`);
-    await usdc.mint(deployer.address, ethers.parseUnits("10000000", 6)); // 10M to deployer
-    await usdc.mint(lpProvider.address, ethers.parseUnits("2000000", 6)); // 2M to LP provider
-    console.log(`${colors.green}✅ USDC minted${colors.reset}\n`);
+  
+  
 
     // ========================================
-    // 2. Deploy Oracle Infrastructure
+    // 1. Deploy Oracle Infrastructure
     // ========================================
     console.log(`${colors.bright}2. Deploying Oracle Infrastructure...${colors.reset}`);
-
+    
     // Deploy MarketStatusOracle
     const MarketStatusOracle = await ethers.getContractFactory("MarketStatusOracle");
-    const marketStatusOracle = await MarketStatusOracle.deploy();
+    const marketStatusOracle = await MarketStatusOracle.deploy(
+      avalancheFujiRouter,
+      avalancheFujiDonID,
+    );
     await marketStatusOracle.waitForDeployment();
     deployments.marketStatusOracle = await marketStatusOracle.getAddress();
     console.log(`${colors.green}✅ MarketStatusOracle deployed at: ${deployments.marketStatusOracle}${colors.reset}`);
@@ -95,7 +106,8 @@ async function main() {
     const tslaOracle = await TSLAOracleManager.deploy(
         CONFIG.oracleWindowSize,
         deployments.marketStatusOracle,
-        
+        avalancheFujiRouter,
+        avalancheFujiDonID,
     );
     await tslaOracle.waitForDeployment();
     deployments.tslaOracle = await tslaOracle.getAddress();
@@ -104,7 +116,9 @@ async function main() {
     // Deploy AAPLOracleManager
     const AAPLOracleManager = await ethers.getContractFactory("AAPLOracleManager");
     const aaplOracle = await AAPLOracleManager.deploy(
-        CONFIG.oracleWindowSize
+        CONFIG.oracleWindowSize,
+        avalancheFujiRouter,
+        avalancheFujiDonID,
     );
     await aaplOracle.waitForDeployment();
     deployments.aaplOracle = await aaplOracle.getAddress();
@@ -121,14 +135,15 @@ async function main() {
     deployments.chainlinkManager = await chainlinkManager.getAddress();
     console.log(`${colors.green}✅ ChainlinkManager deployed at: ${deployments.chainlinkManager}${colors.reset}\n`);
 
+   
     // ========================================
-    // 3. Deploy Core Protocol Contracts
+    // 2. Deploy Core Protocol Contracts
     // ========================================
     console.log(`${colors.bright}3. Deploying Core Protocol Contracts...${colors.reset}`);
 
     // Deploy LiquidityPool
     const LiquidityPool = await ethers.getContractFactory("LiquidityPool");
-    const liquidityPool = await LiquidityPool.deploy(deployments.usdc);
+    const liquidityPool = await LiquidityPool.deploy(usdcAddressAvalancheFuji);
     await liquidityPool.waitForDeployment();
     deployments.liquidityPool = await liquidityPool.getAddress();
     console.log(`${colors.green}✅ LiquidityPool deployed at: ${deployments.liquidityPool}${colors.reset}`);
@@ -136,7 +151,7 @@ async function main() {
     // Deploy Vault (without feeReceiver in constructor - will set later)
     const Vault = await ethers.getContractFactory("Vault");
     const vault = await Vault.deploy(
-      deployments.usdc,
+      usdcAddressAvalancheFuji,
       deployer.address,
       deployments.chainlinkManager
     );
@@ -144,10 +159,24 @@ async function main() {
     deployments.vault = await vault.getAddress();
     console.log(`${colors.green}✅ Vault deployed at: ${deployments.vault}${colors.reset}`);
 
+     // Deploy ChainlinkManager
+    const ReceiverContract = await ethers.getContractFactory("ReceiverContract");
+    const receiverContract = await ReceiverContract.deploy(
+      avalanceFujiRouterContractAddress,
+      usdcAddressAvalancheFuji,
+      deployments.vault,
+      deployments.chainlinkManager
+    );
+    
+    await receiverContract.waitForDeployment();
+    deployments.receiverContract = await receiverContract.getAddress();
+    console.log(`${colors.green}✅ ReceiverContract deployed at: ${deployments.receiverContract}${colors.reset}\n`);
+
+
     // Deploy PerpEngine
     const PerpEngine = await ethers.getContractFactory("PerpEngine");
     const perpEngine = await PerpEngine.deploy(
-      deployments.usdc,
+      usdcAddressAvalancheFuji,
       deployments.liquidityPool,
       deployments.chainlinkManager,
       deployments.vault,
@@ -158,7 +187,7 @@ async function main() {
     console.log(`${colors.green}✅ PerpEngine deployed at: ${deployments.perpEngine}${colors.reset}\n`);
 
     // ========================================
-    // 4. Deploy Synthetic Assets
+    // 3. Deploy Synthetic Assets
     // ========================================
     console.log(`${colors.bright}4. Deploying Synthetic Assets...${colors.reset}`);
 
@@ -180,13 +209,13 @@ async function main() {
     
     // Verify all contracts are properly deployed
     const contracts = {
-      'USDC': deployments.usdc,
       'LiquidityPool': deployments.liquidityPool,
       'Vault': deployments.vault,
       'PerpEngine': deployments.perpEngine,
       'sTSLA': deployments.sTSLA,
       'sAPPL': deployments.sAPPL,
-      'ChainlinkManager': deployments.chainlinkManager
+      'ChainlinkManager': deployments.chainlinkManager,
+      "ReceiverContract": deployments.receiverContract
     };
     
     for (const [name, address] of Object.entries(contracts)) {
@@ -220,7 +249,7 @@ async function main() {
     console.log(`${colors.green}✅ All contracts verified and functional${colors.reset}\n`);
 
     // ========================================
-    // 5. Configure Permissions and Links
+    // 4. Configure Permissions and Links
     // ========================================
     console.log(`${colors.bright}5. Configuring Permissions...${colors.reset}`);
 
@@ -277,18 +306,22 @@ async function main() {
 
     // Configure Vault
     console.log("Configuring Vault...");
+    let tx;
     try {
-      await vault.setFeeReceiver(feeReceiver.address);
+      tx = await vault.setFeeReceiver(feeReceiver.address);
+      await tx.wait(1);
       console.log("setFeeReceiver completed");
       
-      await vault.setPerpEngine(deployments.perpEngine);
+      tx = await vault.setPerpEngine(deployments.perpEngine);
+      await tx.wait(1);
       console.log("setPerpEngine completed");
       
-      await vault.startUpProtocol(
+      tx = await vault.startUpProtocol(
         deployments.sTSLA,
         deployments.sAPPL,
         deployments.perpEngine
       );
+      await tx.wait(1);
       console.log("startUpProtocol completed");
       
     } catch (vaultError) {
@@ -300,7 +333,8 @@ async function main() {
     // Configure PerpEngine
     console.log("Configuring PerpEngine...");
     try {
-      await perpEngine.setVaultAddress(deployments.vault);
+      tx = await perpEngine.setVaultAddress(deployments.vault);
+      await tx.wait();
       console.log("setVaultAddress completed");
     } catch (perpError) {
       console.log(`${colors.red}❌ PerpEngine configuration failed:${colors.reset}`, perpError);
@@ -309,7 +343,7 @@ async function main() {
     console.log(`${colors.green}✅ PerpEngine configured${colors.reset}\n`);
     
     // ========================================
-    // 6. Initialize Liquidity Pool
+    // 5. Initialize Liquidity Pool
     // ========================================
     console.log(`${colors.bright}6. Initializing Liquidity Pool...${colors.reset}`);
 
@@ -328,7 +362,7 @@ async function main() {
     }
 
     // Check LP Provider balance
-    const lpBalance = await usdc.balanceOf(lpProvider.address);
+    const lpBalance = await usdcContract.balanceOf(lpProvider.address);
     console.log(`LP Provider USDC balance: ${ethers.formatUnits(lpBalance, 6)} USDC`);
     console.log(`Amount to deposit: ${ethers.formatUnits(CONFIG.initialLiquidityUSDC, 6)} USDC`);
 
@@ -338,14 +372,14 @@ async function main() {
 
     // Approve USDC spending
     console.log("Approving USDC...");
-    const approvalTx = await usdc.connect(lpProvider).approve(
+    const approvalTx = await usdcContract.connect(lpProvider).approve(
       deployments.liquidityPool,
       CONFIG.initialLiquidityUSDC
     );
     await approvalTx.wait();
 
     // Verify approval
-    const allowance = await usdc.allowance(lpProvider.address, deployments.liquidityPool);
+    const allowance = await usdcContract.allowance(lpProvider.address, deployments.liquidityPool);
     console.log(`Verified allowance: ${ethers.formatUnits(allowance, 6)} USDC`);
 
     if (allowance < CONFIG.initialLiquidityUSDC) {
@@ -361,7 +395,6 @@ async function main() {
     } catch (error) {
       console.log(`${colors.red}❌ Deposit failed${colors.reset}`);
       console.log("Error:", error.message);
-      
       // Try static call for better error info
       try {
         await liquidityPool.connect(lpProvider).deposit.staticCall(CONFIG.initialLiquidityUSDC);
@@ -372,7 +405,7 @@ async function main() {
     }
 
     // ========================================
-    // 7. Initialize Oracle Prices (Mock for testing)
+    // 6. Initialize Oracle Prices (Mock for testing)
     // ========================================
     console.log(`${colors.bright}7. Setting Initial Oracle Prices (Mock)...${colors.reset}`);
     
@@ -388,7 +421,7 @@ async function main() {
     }
 
     // ========================================
-    // 8. Verify Configuration
+    // 7. Verify Configuration
     // ========================================
     console.log(`\n${colors.bright}8. Verifying Deployment...${colors.reset}`);
     
@@ -404,7 +437,7 @@ async function main() {
     console.log(`Vault - Started: ${isStarted}`);
     
     // ========================================
-    // 9. Save Deployment Addresses
+    // 8. Save Deployment Addresses
     // ========================================
     console.log(`\n${colors.bright}9. Saving Deployment Info...${colors.reset}`);
     
@@ -436,13 +469,13 @@ async function main() {
     console.log(`${colors.cyan}${'='.repeat(50)}${colors.reset}\n`);
     
     console.log(`${colors.bright}Key Addresses:${colors.reset}`);
-    console.log(`USDC: ${deployments.usdc}`);
     console.log(`LiquidityPool: ${deployments.liquidityPool}`);
     console.log(`Vault: ${deployments.vault}`);
     console.log(`PerpEngine: ${deployments.perpEngine}`);
     console.log(`sTSLA: ${deployments.sTSLA}`);
     console.log(`sAPPL: ${deployments.sAPPL}`);
     console.log(`ChainlinkManager: ${deployments.chainlinkManager}`);
+    console.log(`Receiver Contract: ${deployments.receiverContract}`);
 
     return deployments;
 
