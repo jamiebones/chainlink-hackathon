@@ -14,7 +14,7 @@ interface IVerifier {
         uint[2] calldata a,
         uint[2][2] calldata b,
         uint[2] calldata c,
-        uint[] calldata input
+        uint[1] calldata input
     ) external view returns (bool);
 }
 
@@ -106,7 +106,7 @@ contract PerpEngineZk is ReentrancyGuard {
     uint[2] calldata a,
     uint[2][2] calldata b,
     uint[2] calldata c,
-    uint[] calldata publicInputs
+    uint[1] calldata publicInputs
 ) external nonReentrant {
     Asset storage a_ = asset[assetId];
     require(a_.root == oldRoot, "stale root");
