@@ -14,9 +14,7 @@ const colors = {
   cyan: "\x1b[36m"
 };
 
-const receiverContractAddress = "0x1393a4d07b5c545b2877e68CCb73C5508ab1c4bA";  //address of the receiver contract on Fuji
-const ethereumSepoliaRouter = "0xb83E47C2bC239B3bf370bc41e1459A34b41238D0";
-const ethereumSepoliaDonID = "0x66756e2d657468657265756d2d7365706f6c69612d3100000000000000000000";
+const receiverContractAddress = "0x60D5A7f7f49D307e36AadAd994EF2e164a42BA54";  //address of the receiver contract on Fuji
 
 //const { router, donId, gasLimit } = network.config;
 
@@ -28,21 +26,10 @@ const destinationChainSelector = 14767482510784806043n;  //Avalanche Fuji Testne
 const ethereumSepoliaRouterAddress = "0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59"; //Ethereum Sepolia Testnet Router
 const gasLimit = 1_000_000; // Adjust as needed
 
-
-//contracts to deploy and the order to deploy them:
-
-//TSLAOracleManager
-//APPLOracleManager
-//ChainlinkManager
-//VaultContractSender
-//ReceiverContract
-//Vault
-
-
 // Deployment configuration
 const CONFIG = {
   // Chainlink subscription IDs (update for your network)
-  chainlinkSubscriptionId: 5139, // Update with your subscription ID
+  chainlinkSubscriptionId: 15656, // Update with your subscription ID
 
   // Initial liquidity amounts
   initialLiquidityUSDC: ethers.parseUnits("100000000000", 6), // 100000000000 USDC
@@ -64,7 +51,7 @@ async function main() {
   console.log(`${colors.cyan}🚀 Starting Synthetic Equity Protocol Deployment${colors.reset}\n`);
 
   const deployer = new ethers.Wallet(process.env.DEPLOYER_PRIVATE_KEY, ethers.provider);
-  const feeReceiver = new ethers.Wallet(process.env.FEE_RECEIVER_PRIVATE_KEY || process.env.DEPLOYER_PRIVATE_KEY, ethers.provider);
+  
 
   console.log(`${colors.yellow}📍 Network: ${network.name}${colors.reset}`);
 
@@ -83,6 +70,7 @@ async function main() {
     // 1. Deploy Core Protocol Contracts
     // ========================================
     console.log(`${colors.bright}3. Deploying Core Protocol Contracts...${colors.reset}`);
+    
 
     const VaultContractSender = await ethers.getContractFactory("VaultContractSender");
     const vaultContractSender = await VaultContractSender.deploy(

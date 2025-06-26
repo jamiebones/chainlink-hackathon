@@ -14,10 +14,10 @@ const deployer = new ethers.Wallet(process.env.DEPLOYER_PRIVATE_KEY, ethers.prov
 
 
 const fujiDestinationChainSelector = 14767482510784806043n; // Avalanche Fuji testnet chain selector
-const receiverContractAddress = "";
+const receiverContractAddress = "0x60D5A7f7f49D307e36AadAd994EF2e164a42BA54"; //receiver contract address on Fuji
 const allowance = ethers.parseEther("10000000000");
 
-const sepoliaSourceContract = ""; //vaultContractSender addresss on sepolia
+const sepoliaSourceContract = "0xC29534f3B12658E58FEf15a454A284eC271C7297"; //vaultContractSender addresss on sepolia
 
 async function main() {
     let tx;

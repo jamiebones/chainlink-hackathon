@@ -2,13 +2,9 @@
   "network": "sepolia",
   "chainId": 11155111,
   "deployer": "0x40BDC27880A522B4346844A96aDAB92DcEDB1664",
-  "timestamp": "2025-06-24T22:04:48.442Z",
+  "timestamp": "2025-06-26T10:06:38.150Z",
   "contracts": {
-    "marketStatusOracle": "0xe688267faF4F8f2Fc49069e687ee942c27E796cF",
-    "tslaOracle": "0xefEaC8aab8a0493FEe31E1652315a0e03CBB2174",
-    "aaplOracle": "0x29aAa96EBd8C8F2467FEd8f9C6BCC9721043d93A",
-    "chainlinkManager": "0x15D11D4e95fECa766745302E9796d3771203E4f3",
-    "vaultContractSender": "0xfA198FF1e7F9944a5693a122B4aC19F52209bE06"
+    "vaultContractSender": "0xC29534f3B12658E58FEf15a454A284eC271C7297"
   },
   "configuration": {
     "initialLiquidityUSDC": "100000000000000000",

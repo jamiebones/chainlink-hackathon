@@ -6,7 +6,7 @@ console.log("Loading environment variables...");
 console.log("Deployer Private Key:", process.env.DEPLOYER_PRIVATE_KEY ? "Set" : "Not Set");
 console.log("Deployer Private Key Length:", process.env.DEPLOYER_PRIVATE_KEY);
 // Private keys (replace defaults in .env for real deploys)
-const DEPLOYER_PRIVATE_KEY = process.env.DEPLOYER_PRIVATE_KEY ;
+const DEPLOYER_PRIVATE_KEY = process.env.DEPLOYER_PRIVATE_KEY;
 const LP_PROVIDER_PRIVATE_KEY = process.env.LP_PROVIDER_PRIVATE_KEY || DEPLOYER_PRIVATE_KEY;
 const FEE_RECEIVER_PRIVATE_KEY = process.env.FEE_RECEIVER_PRIVATE_KEY || DEPLOYER_PRIVATE_KEY;
 
@@ -50,9 +50,9 @@ module.exports = {
   networks: {
     hardhat: {
       chainId: 31337,
-      router:   "0x0000000000000000000000000000000000000000",
-      donId:    "0x0000000000000000000000000000000000000000000000000000000000000000",
-      gasLimit: 100000,  
+      router: "0x0000000000000000000000000000000000000000",
+      donId: "0x0000000000000000000000000000000000000000000000000000000000000000",
+      gasLimit: 100000,
       forking: {
         url: ARBITRUM_RPC_URL,
         enabled: process.env.FORKING === "true",
@@ -61,8 +61,8 @@ module.exports = {
     localhost: {
       url: "http://127.0.0.1:8545",
       chainId: 31337,
-      router:   "0x0000000000000000000000000000000000000000",
-      donId:    "0x0000000000000000000000000000000000000000000000000000000000000000",
+      router: "0x0000000000000000000000000000000000000000",
+      donId: "0x0000000000000000000000000000000000000000000000000000000000000000",
       gasLimit: 100000
     },
     arbitrum: {

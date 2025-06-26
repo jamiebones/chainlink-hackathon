@@ -464,23 +464,6 @@ contract Vault is ReentrancyGuard {
         SyntheticSlot storage vault,
         uint256 tokenToRedeem
     ) private returns (uint256, bool) {
-        // Validate input
-
-        // SyntheticSlot memory vaultCopy = vault; // Create a copy to avoid reentrancy issues
-        // if (vaultCopy.trader == address(0)) {
-        //     revert InvalidVaultID();
-        // }
-        // if (vaultCopy.mintedAmount == 0) {
-        //     revert VaultAlreadyPaidOut();
-        // }
-        // if (vaultCopy.paidOut) {
-        //     revert VaultAlreadyPaidOut();
-        // }
-        // require(
-        //     portionToRedeem <= vaultCopy.mintedAmount,
-        //     "Redeem amount exceeds minted amount"
-        // );
-        // Calculate redemption ratio using token amounts directly
         uint256 redemptionRatio = (tokenToRedeem * PRECISION) /
             vault.mintedAmount;
 
@@ -549,27 +532,10 @@ contract Vault is ReentrancyGuard {
         totalVaultDebt[assetType] -= stockToRedeem;
         //burn the token
         assetContract.burn(msg.sender, stockToRedeem);
-
-        // uint256 currentChainlinkAssetPrice = getScaledChainlinkPrice(assetType);
-        // uint256 totalAmount = (currentChainlinkAssetPrice * stockToRedeem) /
-        //     PRECISION;
-        // uint256 amountToPayInUSDC = convert18ToUSDCDecimal(totalAmount);
-
         uint256 amountFromPerp = perpEngineContract.closeVaultHedge(
             assetType,
             stockToRedeem
         );
-
-        //reduce the globalBuffer with the balance (this is wrong)
-        //needs to confirm this before proceeding
-        // if (globalBufferUSDC[assetType] < amountFromPerp) {
-        //     //case when global buffer is not enough. what happens
-        //     globalBufferUSDC[assetType] = amountFromPerp -
-        //         globalBufferUSDC[assetType];
-        // } else {
-        //     //case when global buffer is enough
-        //     globalBufferUSDC[assetType] -= amountFromPerp;
-        // }
 
         return amountFromPerp;
     }
@@ -624,10 +590,17 @@ contract Vault is ReentrancyGuard {
 
         // Initialize assetContract safely
         IAsset assetContract = assetType == Utils.Asset.TSLA ? sTSLA : sAPPL;
-        //convert to USDC 6 digits
-        uint256 collateralUSDC = (notionalUSDC18 * 110)  / 100 * 10 ** 12;
-        uint256 bufferCollateral = notionalUSDC18 / 10;
-        uint256 hedgeCollateral = collateralUSDC - bufferCollateral;
+        
+        // Calculate collateral components based on the notional value, mirroring _openPosition logic.
+        uint256 notionalUSDC = notionalUSDC18 / 1e12; // Convert from 18 to 6 decimals
+        uint256 collateralUSDC = (notionalUSDC * 110) / 100; // 110% collateral
+        uint256 bufferCollateral = notionalUSDC / 10; // 10% buffer
+        uint256 hedgeCollateral = collateralUSDC - bufferCollateral; // 100% for hedging
+
+        // Optional: Verify consistency of received data with on-chain calculation.
+        // This check is useful for debugging but assumes the off-chain calculation is perfect.
+        // require(usdcPaid == collateralUSDC + mintFeeUSDC, "Inconsistent USDC amount paid");
+
         //increment user buffer collateral and vault debt
         totalUserBufferUSDC[assetType] += bufferCollateral;
         totalVaultDebt[assetType] += numofShares;
