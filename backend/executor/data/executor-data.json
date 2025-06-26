@@ -1,0 +1,37 @@
+{
+  "balances": {
+    "0x742d35cc6635c0532925a3b8ff1f4b4a5c2b9876": {
+      "total": "999000000",
+      "available": "998500000",
+      "locked": "500000",
+      "lastUpdate": 1750931308471
+    },
+    "0x71c70066f9d1128126a1a5e36dee8faff4c55d30": {
+      "total": "998750000",
+      "available": "997500000",
+      "locked": "1250000",
+      "lastUpdate": 1750934672041
+    }
+  },
+  "positions": {
+    "0x742d35cc6635c0532925a3b8ff1f4b4a5c2b9876-0": {
+      "trader": "0x742d35Cc6635C0532925a3b8FF1F4b4a5c2b9876",
+      "assetId": 0,
+      "size": "500000000",
+      "margin": "49500000",
+      "entryPrice": "327550000000000000000",
+      "lastUpdate": 1750931299765
+    },
+    "0x71c70066f9d1128126a1a5e36dee8faff4c55d30-0": {
+      "trader": "0x71C70066F9D1128126a1A5e36Dee8FAfF4C55d30",
+      "assetId": 0,
+      "size": "-750000000",
+      "margin": "74250000",
+      "entryPrice": "327550000000000000000",
+      "lastUpdate": 1750934665283
+    }
+  },
+  "config": {
+    "lastBackup": 1750934672057
+  }
+}

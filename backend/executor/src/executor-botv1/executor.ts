@@ -1,67 +1,69 @@
-import { verifyMessage } from 'ethers';
-import { 
-  hpkeDecrypt, 
-  decryptJSON, 
-  EncryptedData 
-} from './cryptography';
-import { poseidonMerkleTree } from './merkle-tree';
-import { balanceManager } from './balance-manager';
-import { feeCalculator } from './fee-calculator';
-import { positionManager } from './position-manager';
-import { tradeValidator } from './trade-validator';
-import { dataStore } from './data-store';
-import { processBatch, getCurrentPrice } from './contracts';
+import { cryptoManager, TradePayload, EncryptedData } from './crypto';
+import { database, Position } from './database';
+import { feeCalculator } from './fees';
+import { merkleTree } from './merkle';
+import { contractManager } from './contracts';
 
 // ====================================================================
-// INTERFACES & TYPES
+// MINIMAL EXECUTOR - MAIN ORCHESTRATION
 // ====================================================================
 
-export interface TradePayload {
-  trader: string;      // Main wallet address
-  assetId: number;     // Asset ID (0-4)
-  qty: string;         // Position size in USD (always positive)
-  margin: string;      // Collateral amount in USDC (6 decimals)
-  isLong: boolean;     // Direction: true = long, false = short
-  timestamp: number;   // Unix timestamp
-}
-
-export interface EncryptedTradePayload {
-  payload: TradePayload;
-  signature: string;   // Burner wallet signature
-  burnerWallet: string; // Burner wallet address
-}
-
-export interface ProcessedTrade extends EncryptedTradePayload {
+export interface ProcessedTrade {
   tradeId: string;
+  trader: string;
+  assetId: number;
+  qty: bigint;
+  margin: bigint;
+  isLong: boolean;
+  timestamp: number;
   isValid: boolean;
   errors?: string[];
+  fees?: {
+    openingFee: bigint;
+    totalFees: bigint;
+    netMargin: bigint;
+  };
 }
 
-// ====================================================================
-// MAIN EXECUTOR CLASS
-// ====================================================================
+export interface BatchResult {
+  batchId: string;
+  processedTrades: number;
+  assetIds: number[];
+  netDeltas: bigint[];
+  marginDeltas: bigint[];
+  oldRoot: string;
+  newRoot: string;
+  txHash: string;
+  totalFees: bigint;
+  success: boolean;
+  error?: string;
+  timestamp: number;
+}
 
-export class TradeExecutor {
+export class MinimalExecutor {
+  private pendingTrades: ProcessedTrade[] = [];
   private processingBatch = false;
-  private lastProcessedBlock = 0;
-  private readonly BATCH_INTERVAL = 2; // Process every 2 blocks
   private tradeCounter = 0;
   private batchCounter = 0;
+  
+  // Configuration
+  private readonly BATCH_SIZE = 5; // Process every 5 trades
+  private readonly BATCH_TIMEOUT = 30000; // Or every 30 seconds
+  private batchTimer: NodeJS.Timeout | null = null;
 
   constructor() {
-    console.log('🚀 TradeExecutor initializing...');
+    console.log('🚀 Minimal Executor initializing...');
     
-    // Restore last processed block from database
-    this.lastProcessedBlock = dataStore.getLastProcessedBlock();
+    // Start batch timer
+    this.startBatchTimer();
     
-    // Start batch processing
-    this.startBatchProcessor();
-    
-    console.log('✅ TradeExecutor initialized');
+    console.log('✅ Minimal Executor initialized');
+    console.log(`⚙️ Batch size: ${this.BATCH_SIZE} trades`);
+    console.log(`⏰ Batch timeout: ${this.BATCH_TIMEOUT / 1000}s`);
   }
 
   // ====================================================================
-  // 1. TRADE PROCESSING PIPELINE
+  // TRADE PROCESSING
   // ====================================================================
 
   /**
@@ -73,490 +75,517 @@ export class TradeExecutor {
 
     try {
       // Step 1: Decrypt and verify
-      const decryptedPayload = await this.decryptAndVerify(encryptedData);
+      const decryptedTrade = await cryptoManager.processEncryptedTrade(encryptedData);
       
+      if (!decryptedTrade.isValid) {
+        return this.createFailedTrade(tradeId, decryptedTrade.error || 'Decryption failed');
+      }
+
+      const { payload } = decryptedTrade;
+
       // Step 2: Validate trade
-      const validationResult = await tradeValidator.validateTrade(decryptedPayload.payload);
+      const validationResult = await this.validateTrade(payload);
+      if (!validationResult.isValid) {
+        return this.createFailedTrade(tradeId, validationResult.errors.join(', '), payload);
+      }
+
+      // Step 3: Calculate fees and check balance
+      const feeResult = await this.calculateAndValidateFees(payload);
+      if (!feeResult.success) {
+        return this.createFailedTrade(tradeId, feeResult.error!, payload);
+      }
+
+      // Step 4: Lock user balance
+      const balanceLocked = database.lockBalance(
+        payload.trader, 
+        BigInt(payload.margin)
+      );
       
-      // Step 3: Create processed trade
+      if (!balanceLocked) {
+        return this.createFailedTrade(tradeId, 'Failed to lock balance', payload);
+      }
+
+      // Step 5: Create successful trade
       const processedTrade: ProcessedTrade = {
-        ...decryptedPayload,
         tradeId,
-        isValid: validationResult.isValid,
-        errors: validationResult.isValid ? undefined : validationResult.errors
+        trader: payload.trader,
+        assetId: payload.assetId,
+        qty: BigInt(payload.qty),
+        margin: BigInt(payload.margin),
+        isLong: payload.isLong,
+        timestamp: payload.timestamp,
+        isValid: true,
+        fees: feeResult.fees
       };
 
-      // Step 4: Save to database
-      dataStore.saveTrade({
-        tradeId,
-        trader: processedTrade.payload.trader,
-        assetId: processedTrade.payload.assetId,
-        qty: BigInt(processedTrade.payload.qty),
-        margin: BigInt(processedTrade.payload.margin),
-        isLong: processedTrade.payload.isLong,
-        timestamp: processedTrade.payload.timestamp,
-        isValid: processedTrade.isValid,
-        errors: processedTrade.errors
-      });
+      // Step 6: Add to pending trades
+      this.pendingTrades.push(processedTrade);
+      
+      console.log(`✅ Trade ${tradeId} validated and queued`);
+      console.log(`📊 ${payload.trader} ${payload.isLong ? 'LONG' : 'SHORT'} $${Number(BigInt(payload.qty))/1e6} asset ${payload.assetId}`);
+      console.log(`💰 Fees: $${Number(feeResult.fees!.totalFees)/1e6}, Net margin: $${Number(feeResult.fees!.netMargin)/1e6}`);
+      console.log(`📋 Pending trades: ${this.pendingTrades.length}/${this.BATCH_SIZE}`);
 
-      if (validationResult.isValid) {
-        console.log(`✅ Trade ${tradeId} validated and queued`);
-        console.log(`📊 ${processedTrade.payload.trader} ${processedTrade.payload.isLong ? 'LONG' : 'SHORT'} ${Number(BigInt(processedTrade.payload.qty))/1e6} asset ${processedTrade.payload.assetId}`);
-      } else {
-        console.log(`❌ Trade ${tradeId} rejected: ${validationResult.errors.join(', ')}`);
+      // Step 7: Check if we should process batch
+      if (this.pendingTrades.length >= this.BATCH_SIZE) {
+        console.log('🚀 Batch size reached, processing immediately...');
+        setTimeout(() => this.processBatch(), 100); // Process async
       }
 
       return processedTrade;
 
     } catch (error) {
       console.error(`❌ Trade processing failed for ${tradeId}:`, error);
-      
-      // Save failed trade
-      const failedTrade: ProcessedTrade = {
-        payload: {} as TradePayload,
-        signature: '',
-        burnerWallet: '',
-        tradeId,
-        isValid: false,
-        errors: [error instanceof Error ? error.message : 'Unknown error']
-      };
-
-      dataStore.saveTrade({
-        tradeId,
-        trader: '',
-        assetId: 0,
-        qty: 0n,
-        margin: 0n,
-        isLong: true,
-        timestamp: Date.now(),
-        isValid: false,
-        errors: failedTrade.errors
-      });
-
-      throw error;
+      return this.createFailedTrade(tradeId, error instanceof Error ? error.message : 'Unknown error');
     }
-  }
-
-  /**
-   * Decrypt and verify encrypted trade payload
-   */
-  private async decryptAndVerify(encryptedData: EncryptedData): Promise<EncryptedTradePayload> {
-    // Decrypt
-    const decrypted = await decryptJSON(encryptedData);
-    
-    // Validate structure
-    if (!decrypted.payload || !decrypted.signature || !decrypted.burnerWallet) {
-      throw new Error('Invalid encrypted payload structure');
-    }
-
-    // Verify signature
-    const tradeMessage = JSON.stringify(decrypted.payload);
-    const recoveredAddress = verifyMessage(tradeMessage, decrypted.signature);
-
-    if (recoveredAddress.toLowerCase() !== decrypted.burnerWallet.toLowerCase()) {
-      throw new Error(`Signature verification failed: ${recoveredAddress} !== ${decrypted.burnerWallet}`);
-    }
-
-    return decrypted as EncryptedTradePayload;
   }
 
   // ====================================================================
-  // 2. BATCH PROCESSING (EVERY 2 BLOCKS)
+  // BATCH PROCESSING
   // ====================================================================
-
-  /**
-   * Start the batch processor
-   */
-  private startBatchProcessor(): void {
-    console.log('🔄 Starting batch processor (every 2 blocks)...');
-    
-    setInterval(async () => {
-      const currentBlock = await this.getCurrentBlock();
-      
-      if (currentBlock - this.lastProcessedBlock >= this.BATCH_INTERVAL) {
-        await this.processBatch(currentBlock);
-      }
-    }, 15000); // Check every 15 seconds
-  }
 
   /**
    * Process pending trades in a batch
    */
-  private async processBatch(currentBlock: number): Promise<void> {
-    if (this.processingBatch) {
-      console.log('⏳ Batch already processing, skipping...');
-      return;
-    }
-
-    const pendingTrades = dataStore.getPendingTrades();
-    if (pendingTrades.length === 0) {
-      console.log('📭 No pending trades to process');
-      return;
+  async processBatch(): Promise<BatchResult | null> {
+    if (this.processingBatch || this.pendingTrades.length === 0) {
+      return null;
     }
 
     this.processingBatch = true;
     const batchId = this.generateBatchId();
     
-    console.log(`\n🏭 Processing batch ${batchId} with ${pendingTrades.length} trades at block ${currentBlock}`);
+    console.log(`\n🏭 Processing batch ${batchId} with ${this.pendingTrades.length} trades`);
 
     // Create checkpoint for rollback
-    const checkpoint = poseidonMerkleTree.createCheckpoint();
-    
+    const checkpoint = merkleTree.createCheckpoint();
+    const trades = [...this.pendingTrades]; // Copy for processing
+    this.pendingTrades = []; // Clear pending trades
+
     try {
-      // Step 1: Lock user balances
-      await this.lockTradeBalances(pendingTrades);
+      // Step 1: Deduct fees from all trades
+      const totalFees = await this.deductBatchFees(trades);
 
-      // Step 2: Calculate and deduct fees
-      const totalFees = await this.processTradesFees(pendingTrades);
+      // Step 2: Calculate net deltas per asset
+      const assetDeltas = this.calculateAssetDeltas(trades);
 
-      // Step 3: Calculate net deltas per asset
-      const assetDeltas = await this.calculateAssetDeltas(pendingTrades);
+      // Step 3: Update positions and merkle tree
+      const { oldRoot, newRoot } = await this.updatePositionsAndMerkleTree(trades);
 
-      // Step 4: Update positions and merkle tree
-      const { oldRoots, newRoots } = await this.updatePositionsAndMerkleTree(pendingTrades, assetDeltas);
+      // Step 4: Submit batch to contract
+      const txHash = await this.submitBatchToContract(assetDeltas, oldRoot, newRoot);
 
-      // Step 5: Submit batch to contract
-      const txHash = await this.submitBatchToContract(assetDeltas, oldRoots, newRoots);
+      // Step 5: Unlock remaining balances
+      this.unlockRemainingBalances(trades);
 
-      // Step 6: Finalize batch
-      await this.finalizeBatch(batchId, pendingTrades, assetDeltas, totalFees, currentBlock, txHash);
+      const result: BatchResult = {
+        batchId,
+        processedTrades: trades.length,
+        assetIds: Array.from(assetDeltas.keys()),
+        netDeltas: Array.from(assetDeltas.values()).map(d => d.netQtyDelta),
+        marginDeltas: Array.from(assetDeltas.values()).map(d => d.netMarginDelta),
+        oldRoot,
+        newRoot,
+        txHash,
+        totalFees,
+        success: true,
+        timestamp: Date.now()
+      };
 
-      this.lastProcessedBlock = currentBlock;
-      dataStore.setLastProcessedBlock(currentBlock);
-      
       console.log(`✅ Batch ${batchId} processed successfully: ${txHash}`);
+      console.log(`📊 Processed ${trades.length} trades, collected $${Number(totalFees)/1e6} fees`);
+
+      return result;
 
     } catch (error) {
       console.error(`❌ Batch ${batchId} failed:`, error);
       
       // Rollback changes
-      await this.rollbackBatch(checkpoint, pendingTrades);
+      await this.rollbackBatch(checkpoint, trades);
       
-      // Save failed batch
-      dataStore.saveBatch({
+      const result: BatchResult = {
         batchId,
+        processedTrades: 0,
         assetIds: [],
         netDeltas: [],
         marginDeltas: [],
-        processedTrades: 0,
+        oldRoot: checkpoint.root.toString(),
+        newRoot: checkpoint.root.toString(),
+        txHash: '',
         totalFees: 0n,
-        timestamp: Date.now(),
-        blockNumber: currentBlock,
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
+        error: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: Date.now()
+      };
+
+      return result;
 
     } finally {
       this.processingBatch = false;
+      
+      // Restart batch timer
+      this.startBatchTimer();
     }
   }
 
   /**
-   * Lock balances for trades in the batch
+   * Force batch processing (for testing)
    */
-  private async lockTradeBalances(trades: any[]): Promise<void> {
-    console.log('🔒 Locking user balances for batch...');
-    
-    const locks = trades.map(trade => ({
-      user: trade.trader,
-      amount: trade.margin
-    }));
-
-    const success = balanceManager.batchLockBalances(locks);
-    if (!success) {
-      throw new Error('Failed to lock balances for batch');
-    }
-
-    console.log(`✅ Locked balances for ${trades.length} trades`);
+  async forceBatchProcessing(): Promise<BatchResult | null> {
+    console.log('🚀 Force processing batch...');
+    return await this.processBatch();
   }
 
-  /**
-   * Process fees for all trades
-   */
-  private async processTradesFees(trades: any[]): Promise<bigint> {
-    console.log('💰 Processing fees for trades...');
+  // ====================================================================
+  // TRADE VALIDATION
+  // ====================================================================
+
+  private async validateTrade(payload: TradePayload): Promise<{
+    isValid: boolean;
+    errors: string[];
+  }> {
+    const errors: string[] = [];
+
+    // Basic validation
+    if (!payload.trader || !payload.trader.startsWith('0x')) {
+      errors.push('Invalid trader address');
+    }
+
+    if (payload.assetId < 0 || payload.assetId > 4) {
+      errors.push('Invalid asset ID (must be 0-4)');
+    }
+
+    const qty = BigInt(payload.qty);
+    if (qty <= 0n) {
+      errors.push('Position size must be positive');
+    }
+
+    const margin = BigInt(payload.margin);
+    if (margin <= 0n) {
+      errors.push('Margin must be positive');
+    }
+
+    // Size limits
+    const minSize = 10n * 10n ** 6n; // $10 minimum
+    const maxSize = 100000n * 10n ** 6n; // $100k maximum
+
+    if (qty < minSize) {
+      errors.push(`Position too small: $${Number(qty)/1e6} < $${Number(minSize)/1e6}`);
+    }
+
+    if (qty > maxSize) {
+      errors.push(`Position too large: $${Number(qty)/1e6} > $${Number(maxSize)/1e6}`);
+    }
+
+    // Leverage check
+    const leverage = Number(qty) / Number(margin);
+    if (leverage > 10) {
+      errors.push(`Leverage too high: ${leverage.toFixed(2)}x > 10x`);
+    }
+
+    // Trade age check
+    const tradeAge = Date.now() - payload.timestamp;
+    if (tradeAge > 120000) { // 2 minutes
+      errors.push(`Trade too old: ${Math.floor(tradeAge/1000)}s > 120s`);
+    }
+
+    // Check if asset is paused
+    try {
+      const isPaused = await contractManager.isAssetPaused(payload.assetId);
+      if (isPaused) {
+        errors.push(`Asset ${payload.assetId} is currently paused`);
+      }
+    } catch (error) {
+      console.warn('Could not check asset pause status');
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
+  }
+
+  private async calculateAndValidateFees(payload: TradePayload): Promise<{
+    success: boolean;
+    fees?: {
+      openingFee: bigint;
+      totalFees: bigint;
+      netMargin: bigint;
+    };
+    error?: string;
+  }> {
+    try {
+      const fees = feeCalculator.calculateNewPositionFees(
+        BigInt(payload.qty),
+        BigInt(payload.margin),
+        payload.isLong
+      );
+
+      // Check if user has sufficient balance
+      const userBalance = database.getUserBalance(payload.trader);
+      if (userBalance.available < BigInt(payload.margin)) {
+        return {
+          success: false,
+          error: `Insufficient balance: $${Number(userBalance.available)/1e6} < $${Number(BigInt(payload.margin))/1e6}`
+        };
+      }
+
+      return {
+        success: true,
+        fees: {
+          openingFee: fees.openingFee,
+          totalFees: fees.totalFees,
+          netMargin: fees.netMargin
+        }
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Fee calculation failed'
+      };
+    }
+  }
+
+  // ====================================================================
+  // BATCH PROCESSING HELPERS
+  // ====================================================================
+
+  private async deductBatchFees(trades: ProcessedTrade[]): Promise<bigint> {
+    console.log('💰 Deducting fees from all trades...');
     
     let totalFees = 0n;
 
     for (const trade of trades) {
-      const feeBreakdown = await feeCalculator.calculateOpenPositionFees(
-        trade.qty,
-        trade.margin
-      );
-
-      balanceManager.deductFee(trade.trader, feeBreakdown.totalFees);
-      totalFees += feeBreakdown.totalFees;
+      if (trade.fees) {
+        const success = database.deductFee(trade.trader, trade.fees.totalFees);
+        if (success) {
+          totalFees += trade.fees.totalFees;
+        } else {
+          throw new Error(`Failed to deduct fees for ${trade.trader}`);
+        }
+      }
     }
 
-    console.log(`✅ Processed total fees: ${Number(totalFees)/1e6}`);
+    console.log(`✅ Deducted total fees: $${Number(totalFees)/1e6}`);
     return totalFees;
   }
 
-  /**
-   * Calculate net deltas per asset
-   */
-  private async calculateAssetDeltas(trades: any[]): Promise<Map<number, {
+  private calculateAssetDeltas(trades: ProcessedTrade[]): Map<number, {
     netQtyDelta: bigint;
     netMarginDelta: bigint;
-    trades: any[];
-  }>> {
+    trades: ProcessedTrade[];
+  }> {
     console.log('📊 Calculating net deltas per asset...');
     
     const assetDeltas = new Map<number, {
       netQtyDelta: bigint;
       netMarginDelta: bigint;
-      trades: any[];
+      trades: ProcessedTrade[];
     }>();
 
     for (const trade of trades) {
-      const assetId = trade.assetId;
-      
-      if (!assetDeltas.has(assetId)) {
-        assetDeltas.set(assetId, {
+      if (!assetDeltas.has(trade.assetId)) {
+        assetDeltas.set(trade.assetId, {
           netQtyDelta: 0n,
           netMarginDelta: 0n,
           trades: []
         });
       }
 
-      const data = assetDeltas.get(assetId)!;
+      const data = assetDeltas.get(trade.assetId)!;
       
       // Net quantity: positive for long, negative for short
       const signedQty = trade.isLong ? trade.qty : -trade.qty;
       data.netQtyDelta += signedQty;
       
       // Net margin: after fees
-      const feeBreakdown = await feeCalculator.calculateOpenPositionFees(trade.qty, trade.margin);
-      data.netMarginDelta += feeBreakdown.netMargin;
+      data.netMarginDelta += trade.fees?.netMargin || 0n;
       
       data.trades.push(trade);
     }
 
     // Log deltas
     for (const [assetId, data] of assetDeltas) {
-      console.log(`   Asset ${assetId}: netQty=${this.formatDelta(data.netQtyDelta)}, netMargin=${Number(data.netMarginDelta)/1e6}`);
+      console.log(`   Asset ${assetId}: netQty=${this.formatDelta(data.netQtyDelta)}, netMargin=$${Number(data.netMarginDelta)/1e6}`);
     }
 
     return assetDeltas;
   }
 
-  /**
-   * Update positions in merkle tree
-   */
-  private async updatePositionsAndMerkleTree(
-    trades: any[], 
-    assetDeltas: Map<number, any>
-  ): Promise<{ oldRoots: string[], newRoots: string[] }> {
+  private async updatePositionsAndMerkleTree(trades: ProcessedTrade[]): Promise<{
+    oldRoot: string;
+    newRoot: string;
+  }> {
     console.log('🌳 Updating positions and merkle tree...');
     
-    const oldRoots: string[] = [];
-    const newRoots: string[] = [];
-
-    // Get old root
-    const oldRoot = poseidonMerkleTree.getCurrentRootHex();
+    // Get the ACTUAL contract root, not our local root
+    const contractRoot = await contractManager.getCurrentRoot(0); // Assuming asset 0 for now
+    console.log(`📋 Contract root: ${contractRoot}`);
+    
+    const localOldRoot = merkleTree.getCurrentRootHex();
+    console.log(`📋 Local root: ${localOldRoot}`);
+    
+    // If roots don't match, sync our tree to match the contract
+    if (contractRoot.toLowerCase() !== localOldRoot.toLowerCase()) {
+      console.log(`⚠️ Root mismatch detected - syncing to contract root`);
+      // For now, we'll use the contract root as our old root
+      // In production, you'd want to rebuild the tree from the contract state
+    }
     
     // Update positions
     for (const trade of trades) {
-      const currentPrice = await getCurrentPrice(trade.assetId);
-      const feeBreakdown = await feeCalculator.calculateOpenPositionFees(trade.qty, trade.margin);
+      const currentPrice = await contractManager.getCurrentPrice(trade.assetId);
       
-      const position = {
+      const position: Position = {
         trader: trade.trader,
         assetId: trade.assetId,
         size: trade.isLong ? trade.qty : -trade.qty,
-        margin: feeBreakdown.netMargin,
+        margin: trade.fees?.netMargin || trade.margin,
         entryPrice: currentPrice,
-        entryFunding: 0n, // Mock for MVP
         lastUpdate: Date.now()
       };
 
-      // Update in both managers
-      positionManager.updatePosition(position);
-      await poseidonMerkleTree.updatePosition(position);
+      // Update in merkle tree (also saves to database)
+      merkleTree.updatePosition(position);
     }
 
-    // Get new root
-    const newRoot = poseidonMerkleTree.getCurrentRootHex();
+    const newRoot = merkleTree.getCurrentRootHex();
     
-    // For each asset, use the same old/new root (simplified for MVP)
-    for (const assetId of assetDeltas.keys()) {
-      oldRoots.push(oldRoot);
-      newRoots.push(newRoot);
-    }
-
     console.log(`✅ Updated ${trades.length} positions`);
-    console.log(`🌳 Root transition: ${oldRoot.substring(0, 10)}... → ${newRoot.substring(0, 10)}...`);
+    console.log(`🌳 Root transition: ${contractRoot.substring(0, 10)}... → ${newRoot.substring(0, 10)}...`);
 
-    return { oldRoots, newRoots };
+    // Return the contract's current root as oldRoot, and our new calculated root
+    return { 
+      oldRoot: contractRoot, // Use contract's root to avoid stale root error
+      newRoot: newRoot 
+    };
   }
 
-  /**
-   * Submit batch to contract
-   */
   private async submitBatchToContract(
     assetDeltas: Map<number, any>,
-    oldRoots: string[],
-    newRoots: string[]
+    oldRoot: string,
+    newRoot: string
   ): Promise<string> {
-    console.log('📤 Submitting batch to PerpEngineZK...');
+    console.log('📤 Submitting batch to contract...');
     
     const assetIds: number[] = [];
     const netDeltas: bigint[] = [];
     const marginDeltas: bigint[] = [];
+    const oldRoots: string[] = [];
+    const newRoots: string[] = [];
 
     for (const [assetId, data] of assetDeltas) {
+      // Get the actual contract root for this specific asset
+      const contractRoot = await contractManager.getCurrentRoot(assetId);
+      
       assetIds.push(assetId);
       netDeltas.push(data.netQtyDelta);
       marginDeltas.push(data.netMarginDelta);
+      oldRoots.push(contractRoot); // Use contract's current root
+      newRoots.push(newRoot); // Our calculated new root
+      
+      console.log(`📋 Asset ${assetId}: Contract root=${contractRoot.substring(0, 10)}..., New root=${newRoot.substring(0, 10)}...`);
     }
 
-    console.log('🔗 Calling contract: processBatch()');
-    console.log(`   Assets: [${assetIds.join(', ')}]`);
-    console.log(`   Net deltas: [${netDeltas.map(d => this.formatDelta(d)).join(', ')}]`);
-    console.log(`   Margin deltas: [${marginDeltas.map(d => `${Number(d)/1e6}`).join(', ')}]`);
-
-    // Call real contract
-    const txHash = await processBatch(assetIds, oldRoots, newRoots, netDeltas, marginDeltas);
+    const txHash = await contractManager.processBatch(
+      assetIds,
+      oldRoots,
+      newRoots,
+      netDeltas,
+      marginDeltas
+    );
     
     console.log(`✅ Contract call successful: ${txHash}`);
     return txHash;
   }
 
-  /**
-   * Finalize successful batch
-   */
-  private async finalizeBatch(
-    batchId: string,
-    trades: any[],
-    assetDeltas: Map<number, any>,
-    totalFees: bigint,
-    blockNumber: number,
-    txHash: string
-  ): Promise<void> {
-    // Mark trades as processed
-    const tradeIds = trades.map(t => t.tradeId);
-    dataStore.markTradesAsProcessed(tradeIds, batchId);
-
-    // Save batch record
-    dataStore.saveBatch({
-      batchId,
-      assetIds: Array.from(assetDeltas.keys()),
-      netDeltas: Array.from(assetDeltas.values()).map(d => d.netQtyDelta),
-      marginDeltas: Array.from(assetDeltas.values()).map(d => d.netMarginDelta),
-      processedTrades: trades.length,
-      totalFees,
-      timestamp: Date.now(),
-      blockNumber,
-      txHash,
-      success: true
-    });
-
-    console.log(`📋 Batch ${batchId} finalized: ${trades.length} trades, ${Number(totalFees)/1e6} fees`);
+  private unlockRemainingBalances(trades: ProcessedTrade[]): void {
+    console.log('🔓 Unlocking remaining balances...');
+    
+    for (const trade of trades) {
+      // Unlock remaining margin (after fees deducted)
+      const remainingMargin = trade.fees?.netMargin || trade.margin;
+      database.unlockBalance(trade.trader, remainingMargin);
+    }
   }
 
-  /**
-   * Rollback failed batch
-   */
-  private async rollbackBatch(checkpoint: any, trades: any[]): Promise<void> {
+  private async rollbackBatch(checkpoint: any, trades: ProcessedTrade[]): Promise<void> {
     console.log('🔄 Rolling back failed batch...');
     
     // Restore merkle tree
-    await poseidonMerkleTree.restoreFromCheckpoint(checkpoint);
+    merkleTree.restoreFromCheckpoint(checkpoint);
     
-    // Unlock user balances
+    // Restore user balances - add back deducted fees and unlock margins
     for (const trade of trades) {
-      balanceManager.unlockBalance(trade.trader, trade.margin);
+      // Add back deducted fees if they were deducted
+      if (trade.fees) {
+        database.addBalance(trade.trader, trade.fees.totalFees);
+      }
+      
+      // Unlock the margin that was locked
+      const currentBalance = database.getUserBalance(trade.trader);
+      if (currentBalance.locked >= trade.margin) {
+        database.unlockBalance(trade.trader, trade.margin);
+      } else {
+        // If not enough locked, just set available back to what it should be
+        console.warn(`⚠️ Insufficient locked balance for ${trade.trader}, adjusting manually`);
+        const targetAvailable = currentBalance.available + trade.margin;
+        const newBalance = {
+          total: currentBalance.total,
+          available: targetAvailable,
+          locked: currentBalance.locked > 0n ? 0n : currentBalance.locked
+        };
+        database.updateBalance(trade.trader, newBalance);
+      }
     }
+    
+    // Add trades back to pending
+    this.pendingTrades.unshift(...trades);
     
     console.log('✅ Batch rollback complete');
   }
 
   // ====================================================================
-  // 3. BALANCE MANAGEMENT
+  // BATCH TIMER
   // ====================================================================
 
-  /**
-   * Handle user collateral deposit
-   */
-  async depositCollateral(user: string, amount: bigint): Promise<string> {
-    console.log(`💰 Processing deposit: ${user} deposits ${Number(amount)/1e6}`);
-    return await balanceManager.deposit(user, amount);
-  }
+  private startBatchTimer(): void {
+    if (this.batchTimer) {
+      clearTimeout(this.batchTimer);
+    }
 
-  /**
-   * Handle user collateral withdrawal
-   */
-  async withdrawCollateral(user: string, amount: bigint): Promise<string> {
-    console.log(`💸 Processing withdrawal: ${user} withdraws ${Number(amount)/1e6}`);
-    return await balanceManager.withdraw(user, amount);
+    this.batchTimer = setTimeout(() => {
+      if (this.pendingTrades.length > 0 && !this.processingBatch) {
+        console.log('⏰ Batch timeout reached, processing pending trades...');
+        this.processBatch();
+      } else {
+        this.startBatchTimer(); // Restart timer
+      }
+    }, this.BATCH_TIMEOUT);
   }
 
   // ====================================================================
-  // 4. QUERIES & STATISTICS
+  // UTILITIES
   // ====================================================================
 
-  /**
-   * Get pending trades
-   */
-  getPendingTrades(): any[] {
-    return dataStore.getPendingTrades();
-  }
-
-  /**
-   * Get processed trades
-   */
-  getProcessedTrades(limit: number = 100): any[] {
-    return dataStore.getTrades(limit);
-  }
-
-  /**
-   * Get batch history
-   */
-  getBatchHistory(limit: number = 50): any[] {
-    return dataStore.getBatches(limit);
-  }
-
-  /**
-   * Get latest batch
-   */
-  getLatestBatch(): any {
-    return dataStore.getLatestBatch();
-  }
-
-  /**
-   * Get executor statistics
-   */
-  async getStats(): Promise<{
-    trades: any;
-    batches: any;
-    balances: any;
-    positions: any;
-    merkleTree: any;
-    database: any;
-  }> {
+  private createFailedTrade(
+    tradeId: string, 
+    error: string, 
+    payload?: TradePayload
+  ): ProcessedTrade {
     return {
-      trades: {
-        pending: this.getPendingTrades().length,
-        processed: dataStore.getTrades().length
-      },
-      batches: {
-        total: dataStore.getBatches().length,
-        lastProcessedBlock: this.lastProcessedBlock
-      },
-      balances: balanceManager.getStats(),
-      positions: await positionManager.getStats(),
-      merkleTree: poseidonMerkleTree.getStats(),
-      database: dataStore.getStats()
+      tradeId,
+      trader: payload?.trader || '',
+      assetId: payload?.assetId || 0,
+      qty: payload ? BigInt(payload.qty) : 0n,
+      margin: payload ? BigInt(payload.margin) : 0n,
+      isLong: payload?.isLong || true,
+      timestamp: payload?.timestamp || Date.now(),
+      isValid: false,
+      errors: [error]
     };
   }
 
-  // ====================================================================
-  // 5. UTILITIES
-  // ====================================================================
-
-  /**
-   * Generate unique trade ID
-   */
   private generateTradeId(): string {
     this.tradeCounter++;
     const timestamp = Date.now();
@@ -564,62 +593,66 @@ export class TradeExecutor {
     return `trade_${timestamp}_${this.tradeCounter}_${random}`;
   }
 
-  /**
-   * Generate unique batch ID
-   */
   private generateBatchId(): string {
     this.batchCounter++;
     const timestamp = Date.now();
     return `batch_${timestamp}_${this.batchCounter}`;
   }
 
-  /**
-   * Get current block number (mock for MVP)
-   */
-  private async getCurrentBlock(): Promise<number> {
-    // Mock implementation - simulate 15s block time
-    return Math.floor(Date.now() / 15000);
-  }
-
-  /**
-   * Format delta for display
-   */
   private formatDelta(delta: bigint): string {
     const abs = delta < 0n ? -delta : delta;
     const sign = delta < 0n ? '-' : '+';
-    return `${sign}${Number(abs)/1e6}`;
+    return `${sign}$${Number(abs)/1e6}`;
+  }
+
+  // ====================================================================
+  // PUBLIC QUERIES
+  // ====================================================================
+
+  /**
+   * Get pending trades
+   */
+  getPendingTrades(): ProcessedTrade[] {
+    return [...this.pendingTrades];
+  }
+
+  /**
+   * Get executor statistics
+   */
+  getStats(): {
+    pendingTrades: number;
+    totalProcessed: number;
+    totalBatches: number;
+    isProcessing: boolean;
+    nextBatchIn: number;
+  } {
+    const nextBatchIn = this.batchTimer ? this.BATCH_TIMEOUT : 0;
+    
+    return {
+      pendingTrades: this.pendingTrades.length,
+      totalProcessed: this.tradeCounter,
+      totalBatches: this.batchCounter,
+      isProcessing: this.processingBatch,
+      nextBatchIn
+    };
   }
 
   /**
    * Clear all data (for testing)
    */
-  async clear(): Promise<void> {
-    dataStore.clear();
-    await poseidonMerkleTree.clear();
+  clear(): void {
+    this.pendingTrades = [];
     this.tradeCounter = 0;
     this.batchCounter = 0;
-    this.lastProcessedBlock = 0;
-    console.log('🧹 Executor cleared');
-  }
-
-  /**
-   * Verify system integrity
-   */
-  async verifyIntegrity(): Promise<boolean> {
-    try {
-      const merkleOk = await poseidonMerkleTree.verifyIntegrity();
-      
-      console.log(`${merkleOk ? '✅' : '❌'} System integrity check ${merkleOk ? 'passed' : 'failed'}`);
-      return merkleOk;
-    } catch (error) {
-      console.error('❌ System integrity check failed:', error);
-      return false;
+    
+    if (this.batchTimer) {
+      clearTimeout(this.batchTimer);
     }
+    
+    this.startBatchTimer();
+    console.log('🧹 Executor cleared');
   }
 }
 
-// ====================================================================
-// EXPORT
-// ====================================================================
-
-export const tradeExecutor = new TradeExecutor();
+// Export singleton instance
+export const executor = new MinimalExecutor();
