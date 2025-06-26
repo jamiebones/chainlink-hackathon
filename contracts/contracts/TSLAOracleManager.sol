@@ -31,9 +31,8 @@ contract TSLAOracleManager is FunctionsClient, ConfirmedOwner {
     IMarketStatusOracle public marketStatusOracle;
 
     // Chainlink config (update for your network as needed)
-    address constant router = 0xA9d587a00A31A52Ed70D6026794a8FC5E2F5dCb0;
-    bytes32 constant donID =
-       0x66756e2d6176616c616e6368652d66756a692d31000000000000000000000000;
+    address private router;
+    bytes32 private donID;
     uint32 constant gasLimit = 300000;
 
     string constant source =
@@ -54,13 +53,17 @@ contract TSLAOracleManager is FunctionsClient, ConfirmedOwner {
 
     constructor(
         uint256 _windowSize,
-        address _marketStatusOracle
-    ) FunctionsClient(router) ConfirmedOwner(msg.sender) {
+        address _marketStatusOracle,
+        address _router,
+        bytes32 _donID
+    ) FunctionsClient(_router) ConfirmedOwner(msg.sender) {
         require(_windowSize > 0 && _windowSize < 1000, "Invalid window size");
         windowSize = _windowSize;
         prices = new uint256[](_windowSize);
         pointer = 0;
         priceCount = 0;
+        router = _router;
+        donID = _donID;
         marketStatusOracle = IMarketStatusOracle(_marketStatusOracle);
     }
 
@@ -138,3 +141,6 @@ contract TSLAOracleManager is FunctionsClient, ConfirmedOwner {
         return lastPrice;
     }
 }
+
+
+//verify 

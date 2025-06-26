@@ -2,15 +2,18 @@ require("@nomicfoundation/hardhat-toolbox");
 require("@nomicfoundation/hardhat-verify"); // Add this for verification
 require("dotenv").config();
 
+console.log("Loading environment variables...");
+console.log("Deployer Private Key:", process.env.DEPLOYER_PRIVATE_KEY ? "Set" : "Not Set");
+console.log("Deployer Private Key Length:", process.env.DEPLOYER_PRIVATE_KEY);
 // Private keys (replace defaults in .env for real deploys)
-const DEPLOYER_PRIVATE_KEY = process.env.DEPLOYER_PRIVATE_KEY || "0x0000000000000000000000000000000000000000000000000000000000000000";
+const DEPLOYER_PRIVATE_KEY = process.env.DEPLOYER_PRIVATE_KEY;
 const LP_PROVIDER_PRIVATE_KEY = process.env.LP_PROVIDER_PRIVATE_KEY || DEPLOYER_PRIVATE_KEY;
 const FEE_RECEIVER_PRIVATE_KEY = process.env.FEE_RECEIVER_PRIVATE_KEY || DEPLOYER_PRIVATE_KEY;
 
 // RPC URLs
 const ARBITRUM_RPC_URL = process.env.ARBITRUM_RPC_URL || "https://arb1.arbitrum.io/rpc";
 const ARBITRUM_SEPOLIA_RPC_URL = process.env.ARBITRUM_SEPOLIA_RPC_URL || "https://sepolia-rollup.arbitrum.io/rpc";
-const SEPOLIA_RPC_URL = process.env.SEPOLIA_RPC_URL || "https://eth-sepolia.g.alchemy.com/v2/demo";
+const SEPOLIA_RPC_URL = process.env.SEPOLIA_RPC_URL || "https://sepolia.infura.io/v3/f1edc87fbdfb4481a679028ae7ec375a";
 const MAINNET_RPC_URL = process.env.MAINNET_RPC_URL || "https://eth-mainnet.g.alchemy.com/v2/demo";
 const FUJI_RPC_URL = process.env.FUJI_RPC_URL || "https://api.avax-test.network/ext/bc/C/rpc";
 
@@ -47,9 +50,9 @@ module.exports = {
   networks: {
     hardhat: {
       chainId: 31337,
-      router:   "0x0000000000000000000000000000000000000000",
-      donId:    "0x0000000000000000000000000000000000000000000000000000000000000000",
-      gasLimit: 100000,  
+      router: "0x0000000000000000000000000000000000000000",
+      donId: "0x0000000000000000000000000000000000000000000000000000000000000000",
+      gasLimit: 100000,
       forking: {
         url: ARBITRUM_RPC_URL,
         enabled: process.env.FORKING === "true",
@@ -58,8 +61,8 @@ module.exports = {
     localhost: {
       url: "http://127.0.0.1:8545",
       chainId: 31337,
-      router:   "0x0000000000000000000000000000000000000000",
-      donId:    "0x0000000000000000000000000000000000000000000000000000000000000000",
+      router: "0x0000000000000000000000000000000000000000",
+      donId: "0x0000000000000000000000000000000000000000000000000000000000000000",
       gasLimit: 100000
     },
     arbitrum: {
