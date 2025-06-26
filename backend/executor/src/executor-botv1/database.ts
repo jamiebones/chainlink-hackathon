@@ -57,17 +57,26 @@ export class MinimalDatabase {
   // ====================================================================
 
   /**
-   * Add balance manually (for testing)
+   * Add balance to user (can be negative for deductions)
    */
-  addBalance(address: string, amount: bigint): void {
-    const current = this.getUserBalance(address);
-    this.updateBalance(address, {
-      total: current.total + amount,
-      available: current.available + amount,
-      locked: current.locked
-    });
-    console.log(`💰 Added ${this.formatUSDC(amount)} to ${address}`);
-    this.saveToBackup();
+  addBalance(address: string, amount: bigint): boolean {
+    try {
+      const current = this.getUserBalance(address);
+      
+      this.updateBalance(address, {
+        total: current.total + amount,
+        available: current.available + amount,
+        locked: current.locked
+      });
+      
+      const action = amount >= 0n ? 'Added' : 'Deducted';
+      const absAmount = amount >= 0n ? amount : -amount;
+      console.log(`💰 ${action} ${this.formatUSDC(absAmount)} ${amount >= 0n ? 'to' : 'from'} ${address}`);
+      return true;
+    } catch (error) {
+      console.error('Failed to add/deduct balance:', error);
+      return false;
+    }
   }
 
   /**
@@ -224,6 +233,36 @@ export class MinimalDatabase {
     
     console.log(`📊 Saved position: ${key} ${this.formatPosition(position)}`);
     this.saveToBackup();
+  }
+
+  /**
+   * Update position size (for partial closes)
+   */
+  updatePositionSize(trader: string, assetId: number, newSize: bigint): boolean {
+    const position = this.getPosition(trader, assetId);
+    if (!position) {
+      console.error(`❌ Position not found for update: ${trader} asset ${assetId}`);
+      return false;
+    }
+    
+    if (newSize === 0n) {
+      // Remove position entirely
+      const key = `${trader.toLowerCase()}-${assetId}`;
+      delete this.data.positions[key];
+      console.log(`🗑️ Position removed: ${key}`);
+    } else {
+      // Update position size
+      const updatedPosition: Position = {
+        ...position,
+        size: newSize,
+        lastUpdate: Date.now()
+      };
+      this.savePosition(updatedPosition);
+      console.log(`📏 Position size updated: ${trader} asset ${assetId} new size: ${this.formatPosition(updatedPosition)}`);
+    }
+    
+    this.saveToBackup();
+    return true;
   }
 
   /**

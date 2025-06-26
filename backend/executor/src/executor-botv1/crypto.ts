@@ -35,6 +35,19 @@ export interface EncryptedTradePayload {
   burnerWallet: string; // Burner wallet address
 }
 
+export interface ClosePositionPayload {
+  trader: string;      // Same trader
+  assetId: number;     // Same asset
+  closePercent: number; // 100 = full close, 50 = half close, etc.
+  timestamp: number;   // When close was requested
+}
+
+export interface EncryptedClosePayload {
+  payload: ClosePositionPayload;
+  signature: string;
+  burnerWallet: string;
+}
+
 export class CryptoManager {
   private privateKey: string | null = null;
   private publicKey: string | null = null;
@@ -343,6 +356,100 @@ export class CryptoManager {
 
     return await this.encryptJSON(encryptedPayload);
   }
+
+  /**
+   * Process encrypted close request
+   */
+  async processEncryptedClose(encryptedData: EncryptedData): Promise<{
+    payload: ClosePositionPayload;
+    signature: string;
+    burnerWallet: string;
+    isValid: boolean;
+    error?: string;
+  }> {
+    try {
+      console.log('🔄 Processing encrypted close request...');
+      
+      // Step 1: Decrypt the data
+      const decrypted = await this.decryptJSON(encryptedData);
+      
+      // Step 2: Validate structure
+      if (!decrypted.payload || !decrypted.signature || !decrypted.burnerWallet) {
+        throw new Error('Invalid encrypted close payload structure');
+      }
+
+      const { payload, signature, burnerWallet } = decrypted as EncryptedClosePayload;
+
+      // Step 3: Verify signature
+      const isValid = this.verifyCloseSignature(payload, signature, burnerWallet);
+
+      if (!isValid) {
+        return {
+          payload,
+          signature,
+          burnerWallet,
+          isValid: false,
+          error: 'Signature verification failed'
+        };
+      }
+
+      console.log('✅ Encrypted close request processed successfully');
+      return {
+        payload,
+        signature,
+        burnerWallet,
+        isValid: true
+      };
+
+    } catch (error) {
+      console.error('❌ Failed to process encrypted close request:', error);
+      
+      return {
+        payload: {} as ClosePositionPayload,
+        signature: '',
+        burnerWallet: '',
+        isValid: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Verify close request signature
+   */
+  verifyCloseSignature(payload: ClosePositionPayload, signature: string, burnerWallet: string): boolean {
+    const message = JSON.stringify(payload);
+    return this.verifySignature(message, signature, burnerWallet);
+  }
+
+  /**
+   * Create sample encrypted close request (for testing)
+   */
+  async createSampleClosePosition(overrides: Partial<ClosePositionPayload> = {}): Promise<EncryptedData> {
+    const sampleClose: ClosePositionPayload = {
+      trader: "0x742d35Cc6635C0532925a3b8FF1F4b4a5c2b9876",
+      assetId: 0,
+      closePercent: 100, // Full close by default
+      timestamp: Date.now(),
+      ...overrides
+    };
+
+  // Create a test wallet for signing
+  const testPrivateKey = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+  const testWallet = new ethers.Wallet(testPrivateKey);
+  
+  // Sign the close request
+  const message = JSON.stringify(sampleClose);
+  const signature = await testWallet.signMessage(message);
+
+  const encryptedPayload: EncryptedClosePayload = {
+    payload: sampleClose,
+    signature: signature,
+    burnerWallet: testWallet.address
+  };
+
+  return await this.encryptJSON(encryptedPayload);
+}
 
   // ====================================================================
   // UTILITIES

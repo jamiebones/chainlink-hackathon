@@ -1,11 +1,12 @@
 import express from 'express';
 import cors from 'cors';
-import { cryptoManager, EncryptedData, TradePayload } from './crypto';
+import { cryptoManager, EncryptedData, TradePayload, ClosePositionPayload } from './crypto';
 import { database } from './database';
 import { feeCalculator } from './fees';
 import { merkleTree } from './merkle';
 import { contractManager } from './contracts';
 import { executor } from './executor';
+import { closeExecutor } from './close-executor';
 
 // ====================================================================
 // MINIMAL API SERVER FOR TESTING
@@ -55,11 +56,12 @@ app.get('/ping', (req, res) => {
  */
 app.get('/status', async (req, res) => {
   try {
-    const [contractStatus, executorStats, databaseStats, merkleStats] = await Promise.all([
+    const [contractStatus, executorStats, databaseStats, merkleStats, closeExecutorStats] = await Promise.all([
       contractManager.getStatus(),
       executor.getStats(),
       database.getStats(),
-      merkleTree.getStats()
+      merkleTree.getStats(),
+      closeExecutor.getStats()
     ]);
 
     res.json({
@@ -68,6 +70,7 @@ app.get('/status', async (req, res) => {
       executor: executorStats,
       database: databaseStats,
       merkleTree: merkleStats,
+      closeExecutor: closeExecutorStats,
       crypto: cryptoManager.getStatus(),
       fees: feeCalculator.getFeeSummary(),
       timestamp: new Date().toISOString()
@@ -360,6 +363,108 @@ app.post('/trade/create-test', async (req, res) => {
 });
 
 // ====================================================================
+// 4B. POSITION CLOSING
+// ====================================================================
+
+/**
+ * Create close position request
+ */
+app.post('/trade/create-close', async (req, res) => {
+  try {
+    const closeRequest: ClosePositionPayload = {
+      trader: req.body.trader || "0x742d35Cc6635C0532925a3b8FF1F4b4a5c2b9876",
+      assetId: req.body.assetId || 0,
+      closePercent: req.body.closePercent || 100, // Default full close
+      timestamp: Date.now()
+    };
+
+    const encrypted = await cryptoManager.createSampleClosePosition(closeRequest);
+    
+    res.json({
+      success: true,
+      message: 'Close position request created',
+      encrypted: {
+        enc: encrypted.enc,
+        ct: encrypted.ct
+      },
+      closeRequest,
+      instructions: 'Use this encrypted data with POST /trade/close',
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to create close request'
+    });
+  }
+});
+
+/**
+ * Submit close position request
+ */
+app.post('/trade/close', async (req, res) => {
+  try {
+    const { enc, ct } = req.body;
+    
+    if (!enc || !ct) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: enc, ct'
+      });
+    }
+    
+    console.log('🔄 Processing encrypted close submission...');
+    
+    const encryptedData: EncryptedData = { enc, ct };
+    const processedClose = await closeExecutor.processEncryptedClose(encryptedData);
+    
+    res.json({
+      success: true,
+      message: 'Close position processed',
+      close: {
+        closeId: processedClose.closeId,
+        trader: processedClose.trader,
+        assetId: processedClose.assetId,
+        closePercent: processedClose.closePercent,
+        marketData: {
+          entryPrice: processedClose.marketData.entryPrice.toString(),
+          currentPrice: processedClose.marketData.currentPrice.toString(),
+          priceChange: `${processedClose.marketData.priceChange > 0 ? '+' : ''}${processedClose.marketData.priceChange.toFixed(2)}%`
+        },
+        pnl: {
+          unrealizedPnL: processedClose.pnl.unrealizedPnL.toString(),
+          unrealizedPnLUSD: `$${(Number(processedClose.pnl.unrealizedPnL) / 1e6).toFixed(2)}`,
+          closingFees: processedClose.pnl.closingFees.toString(),
+          closingFeesUSD: `$${(Number(processedClose.pnl.closingFees) / 1e6).toFixed(2)}`,
+          netPayout: processedClose.pnl.netPayout.toString(),
+          netPayoutUSD: `$${(Number(processedClose.pnl.netPayout) / 1e6).toFixed(2)}`
+        },
+        position: {
+          originalSize: processedClose.position.originalSize.toString(),
+          closeSize: processedClose.position.closeSize.toString(),
+          remainingSize: processedClose.position.remainingSize.toString(),
+          isFullClose: processedClose.position.isFullClose
+        },
+        isValid: processedClose.isValid,
+        errors: processedClose.errors
+      },
+      executor: {
+        pendingCloses: closeExecutor.getPendingCloses().length
+      },
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('❌ Close submission failed:', error);
+    res.status(400).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Close submission failed'
+    });
+  }
+});
+
+// ====================================================================
 // 5. BATCH PROCESSING
 // ====================================================================
 
@@ -437,6 +542,88 @@ app.post('/batch/process', async (req, res) => {
     });
   }
 });
+
+// ====================================================================
+// 5B. CLOSE BATCH PROCESSING
+// ====================================================================
+
+/**
+ * Get pending closes
+ */
+app.get('/close/pending', (req, res) => {
+  try {
+    const pendingCloses = closeExecutor.getPendingCloses();
+    
+    res.json({
+      success: true,
+      pendingCloses: pendingCloses.map(close => ({
+        closeId: close.closeId,
+        trader: close.trader,
+        assetId: close.assetId,
+        closePercent: close.closePercent,
+        unrealizedPnL: close.pnl.unrealizedPnL.toString(),
+        netPayout: close.pnl.netPayout.toString(),
+        isFullClose: close.position.isFullClose,
+        timestamp: close.timestamp
+      })),
+      count: pendingCloses.length,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch pending closes'
+    });
+  }
+});
+
+/**
+ * Force close batch processing
+ */
+app.post('/close/process', async (req, res) => {
+  try {
+    console.log('🚀 Manual close batch processing requested...');
+    
+    const result = await closeExecutor.forceCloseBatchProcessing();
+    
+    if (!result) {
+      return res.json({
+        success: true,
+        message: 'No closes to process',
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: result.success ? 'Close batch processed successfully' : 'Close batch processing failed',
+      batch: {
+        batchId: result.batchId,
+        processedCloses: result.processedCloses,
+        totalPnL: result.totalPnL.toString(),
+        totalPnLUSD: `$${(Number(result.totalPnL) / 1e6).toFixed(2)}`,
+        totalFees: result.totalFees.toString(),
+        totalFeesUSD: `$${(Number(result.totalFees) / 1e6).toFixed(2)}`,
+        totalPayout: result.totalPayout.toString(),
+        totalPayoutUSD: `$${(Number(result.totalPayout) / 1e6).toFixed(2)}`,
+        affectedAssets: result.affectedAssets,
+        oldRoot: result.oldRoot,
+        newRoot: result.newRoot,
+        txHash: result.txHash,
+        success: result.success,
+        error: result.error
+      },
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Close batch processing failed'
+    });
+  }
+});
+
 
 // ====================================================================
 // 6. POSITIONS & MERKLE TREE
@@ -525,6 +712,69 @@ app.get('/merkle/stats', (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to fetch merkle tree stats'
+    });
+  }
+});
+
+// ====================================================================
+// 6B. PNL & ANALYTICS
+// ====================================================================
+
+/**
+ * Get current PnL for user positions
+ */
+app.get('/pnl/:user', async (req, res) => {
+  try {
+    const { user } = req.params;
+    const { assetId } = req.query;
+    
+    console.log(`📊 Getting PnL for user: ${user}${assetId ? ` asset: ${assetId}` : ''}`);
+    
+    const pnlData = await closeExecutor.calculateCurrentPnL(
+      user, 
+      assetId ? parseInt(assetId as string) : undefined
+    );
+    
+    res.json({
+      success: true,
+      trader: pnlData.trader,
+      summary: {
+        totalUnrealizedPnL: pnlData.totalUnrealizedPnL.toString(),
+        totalUnrealizedPnLUSD: `$${(Number(pnlData.totalUnrealizedPnL) / 1e6).toFixed(2)}`,
+        totalClosingFees: pnlData.totalClosingFees.toString(),
+        totalClosingFeesUSD: `$${(Number(pnlData.totalClosingFees) / 1e6).toFixed(2)}`,
+        netPnL: pnlData.netPnL.toString(),
+        netPnLUSD: `$${(Number(pnlData.netPnL) / 1e6).toFixed(2)}`,
+        positionCount: pnlData.positions.length,
+        status: pnlData.netPnL > 0n ? 'PROFIT' : pnlData.netPnL < 0n ? 'LOSS' : 'BREAKEVEN'
+      },
+      positions: pnlData.positions.map(pos => ({
+        assetId: pos.assetId,
+        side: pos.isLong ? 'LONG' : 'SHORT',
+        size: pos.size.toString(),
+        sizeUSD: `$${(Number(pos.size < 0n ? -pos.size : pos.size) / 1e6).toFixed(2)}`,
+        entryPrice: pos.entryPrice.toString(),
+        entryPriceFormatted: `$${(Number(pos.entryPrice) / 1e18).toFixed(2)}`,
+        currentPrice: pos.currentPrice.toString(),
+        currentPriceFormatted: `$${(Number(pos.currentPrice) / 1e18).toFixed(2)}`,
+        unrealizedPnL: pos.unrealizedPnL.toString(),
+        unrealizedPnLUSD: `$${(Number(pos.unrealizedPnL) / 1e6).toFixed(2)}`,
+        closingFees: pos.closingFees.toString(),
+        closingFeesUSD: `$${(Number(pos.closingFees) / 1e6).toFixed(2)}`,
+        netPnL: pos.netPnL.toString(),
+        netPnLUSD: `$${(Number(pos.netPnL) / 1e6).toFixed(2)}`,
+        pnlPercent: `${pos.pnlPercent > 0 ? '+' : ''}${pos.pnlPercent.toFixed(2)}%`,
+        healthFactor: pos.healthFactor.toFixed(2),
+        status: pos.netPnL > 0n ? 'PROFIT' : pos.netPnL < 0n ? 'LOSS' : 'BREAKEVEN'
+      })),
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('❌ Failed to calculate PnL:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to calculate PnL'
     });
   }
 });
