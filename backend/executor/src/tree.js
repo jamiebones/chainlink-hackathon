@@ -4,6 +4,8 @@ exports.hashLeaf = hashLeaf;
 exports.currentRoot = currentRoot;
 exports.insertPosition = insertPosition;
 exports.deletePosition = deletePosition;
+exports.getPathIndices = getPathIndices;
+exports.getPathElements = getPathElements;
 var imt_1 = require("@zk-kit/imt");
 var poseidon_lite_1 = require("poseidon-lite");
 // Use poseidon3 for leaf hash (3 fields)
@@ -45,3 +47,22 @@ function deletePosition(hash) {
 }
 // deletePosition(15215956860192754867003942406872706015577979927073229954434143459039467021244n)
 // console.log(tree)
+// const proof = tree.createProof(0)
+// console.log("Proof:", proof);
+function getPathIndices(index) {
+    var proof = tree.createProof(index);
+    return proof.pathIndices;
+}
+function getPathElements(index) {
+    var proof = tree.createProof(index);
+    var elements = proof.siblings;
+    var pathElements = [];
+    for (var i = 0; i < elements.length; i++) {
+        pathElements.push(elements[i].toString());
+    }
+    return pathElements;
+}
+var elements = getPathElements(0);
+console.log("Path Elements:", elements);
+var indices = getPathIndices(0);
+console.log("Path Indices:", indices);
