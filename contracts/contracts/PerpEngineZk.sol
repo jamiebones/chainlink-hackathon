@@ -3,6 +3,7 @@ pragma solidity ^0.8.19;
 
 import {Ownable}          from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard}  from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 interface IPerpEngine {
     function applyNetDelta(uint8 assetId, int256 qtyDelta, int256 marginDelta) external;
@@ -25,6 +26,8 @@ contract PerpEngineZk is ReentrancyGuard {
         uint40  lastUpdate;    // Last root update timestamp
     }
 
+    IERC20 private usdcContract;
+
     /// Mapping asset-ID → state  
     mapping(uint8 => Asset) public asset;
 
@@ -32,7 +35,7 @@ contract PerpEngineZk is ReentrancyGuard {
           CONSTANTS
     ───────────────────*/
 
-    IVerifier public immutable verifier;
+    IVerifier public verifier;
     IPerpEngine public immutable perpEngine;
     address public immutable owner;
 
@@ -48,10 +51,12 @@ contract PerpEngineZk is ReentrancyGuard {
        CONSTRUCTOR
     ───────────────────*/
 
-    constructor(address _verifier, address _perpEngine) {
+    constructor(address _verifier, address _perpEngine, address _usdc) {
         owner = msg.sender;
         verifier = IVerifier(_verifier);
         perpEngine = IPerpEngine(_perpEngine);
+        usdcContract = IERC20(_usdc);
+        usdcContract.approve(_perpEngine, type(uint256).max);
     }
 
     modifier onlyOwner() {
@@ -181,5 +186,9 @@ contract PerpEngineZk is ReentrancyGuard {
         asset[assetId].root = initialRoot;
         asset[assetId].lastUpdate = uint40(block.timestamp);
         emit RootUpdated(assetId, bytes32(0), initialRoot);
+    }
+
+    function setVerifier(address _verifier) external onlyOwner {
+        verifier = IVerifier(_verifier);
     }
 }

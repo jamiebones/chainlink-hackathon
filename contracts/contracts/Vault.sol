@@ -161,7 +161,6 @@ contract Vault is ReentrancyGuard {
         sAPPL = IAsset(_sAPPL);
         perpEngineContract = PerpEngine(_perpEngine);
         usdcContract.approve(_perpEngine, type(uint256).max);
-
     }
 
     function openPosition(

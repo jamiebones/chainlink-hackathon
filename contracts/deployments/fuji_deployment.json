@@ -2,22 +2,23 @@
   "network": "fuji",
   "chainId": 43113,
   "deployer": "0x14D24C79be77CD4fE8d544CAd5ab0b7b0aCd50Fe",
-  "timestamp": "2025-06-17T16:57:46.182Z",
+  "timestamp": "2025-06-26T09:39:25.128Z",
   "contracts": {
-    "usdc": "0xDD655EC06411cA3468E641A974d66804414Cb2A2",
-    "marketStatusOracle": "0xa6210892F59512900afa67A90ba48b016A4f2bb0",
-    "tslaOracle": "0x27759B8d346654e2CB959cd786Fa0c7581bE6fd6",
-    "aaplOracle": "0xaC5900e5E4a18F1C6b58f54f9687049877e61a76",
-    "chainlinkManager": "0x31ed4a47298b921Ba21Cc57d556bce3556ed46F5",
-    "liquidityPool": "0x03F1cF0379cDc2F2Bb0c94FfFbC9eCE3260361C4",
-    "vault": "0x999927B5EBb9B70Fa65Eba728f319C7C609530F4",
-    "perpEngine": "0xB9485C15cAF89Fb90be7CE14B336975F4FAE8D8f",
-    "sTSLA": "0x7C2826429D0483C256E5AcEc5Ee58B19FFFf7862",
-    "sAPPL": "0xE75D90De80Cd3f5C24BAE660F78c6D8F2F3df8da"
+    "usdc": "0xf5fCE270b86E5e6AC7faf6E6C6D9fb5D3943693A",
+    "marketStatusOracle": "0x8Ab3eFa446799552F214f68fdA72B67Ad55651da",
+    "tslaOracle": "0xfb444bf6425d9d65f681680b444e37c17059dBf2",
+    "aaplOracle": "0xB1D19ed4718Cbd774AfEfA5CBa8f6B64E91E5F71",
+    "chainlinkManager": "0x1f2B64f9Eb02363aE63557d222D0676c2aCa64d1",
+    "liquidityPool": "0x6B3b404fCe24578aF45188A9f44b87aC5adC8f23",
+    "vault": "0x902Cd7068D6119ceE2Dbd66de8A54e7247198175",
+    "perpEngine": "0x03D4Ec3Bc490D6D9Cd6D2C245269363B611Af01b",
+    "perpEngineZk": "0x7DeCCb8C97920E3B5c7576566f1E5bB84fE69d35",
+    "sTSLA": "0x6377Ac0e3ba45C28b8752a2d98DC9701ab1FcAdA",
+    "sAPPL": "0x7DBeBC457c5f252dE13c4EF3ee807d4CD1AdFB8a"
   },
   "configuration": {
-    "initialLiquidityUSDC": "100000000000",
-    "oracleWindowSize": 10,
+    "initialLiquidityUSDC": "1000000000",
+    "oracleWindowSize": 60,
     "feeReceiver": "0x71C70066F9D1128126a1A5e36Dee8FAfF4C55d30",
     "lpProvider": "0x71C70066F9D1128126a1A5e36Dee8FAfF4C55d30"
   }
