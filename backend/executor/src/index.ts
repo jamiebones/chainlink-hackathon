@@ -33,7 +33,7 @@ let recipientPubKey: CryptoKey;
     const pubKey = arrayBufferToBase64url(pubKeyBuf);
     const privKey = arrayBufferToBase64url(privKeyBuf);
     fs.writeFileSync('.hpke-secret', privKey);
-    fs.writeFileSync('../../frontend/public/hpke-key.txt', pubKey);
+    fs.writeFileSync('../../../frontend-V1/public/hpke-key.txt', pubKey);
     console.log('HPKE keypair generated & saved.');
 })();
 
@@ -70,16 +70,16 @@ console.log("ctArrayBuffer is ", ctArrayBuffer)
      const pt = await recipient.open(ctArrayBuffer);
      console.log(new TextDecoder().decode(pt));
     // const pt = await recipient.open(ctBytes);
-    // const textFetched = new TextDecoder().decode(pt);
-    // console.log('Decrypted payload (JSON):', textFetched);
+    const textFetched = new TextDecoder().decode(pt);
+    console.log('Decrypted payload (JSON):', textFetched);
 
-    // Extract and verify signature
-    // const { payload, sig } = JSON.parse(textFetched);
-    // const recovered = verifyMessage(JSON.stringify(payload), sig);
-    // if (recovered.toLowerCase() !== payload.trader.toLowerCase()) {
-    //   throw new Error('bad signature');
-    // }
-    // console.log('✅ Burner wallet + HPKE worked! Trade:', payload);
+   
+    const { payload, sig } = JSON.parse(textFetched);
+    const recovered = verifyMessage(JSON.stringify(payload), sig);
+    if (recovered.toLowerCase() !== payload.trader.toLowerCase()) {
+      throw new Error('bad signature');
+    }
+    console.log('✅ Burner wallet + HPKE worked! Trade:', payload);
 
     res.json({ ok: true });
   } catch (e) {

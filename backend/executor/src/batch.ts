@@ -48,7 +48,7 @@
 // }
 
 import { upsert, currentRoot, Leaf } from './tree'
-import { proveAndLiquidate } from './proof';
+import { proveAndLiquidate } from './proof.js';
 import { getPrice } from './oracle';
 import { ethers } from 'ethers';
 import PerpZKABI from './abis/PerpEngineZK.json';
