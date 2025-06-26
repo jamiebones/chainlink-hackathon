@@ -50,12 +50,12 @@ import { prove, verify } from "@zk-kit/groth16";
 import { resolve } from "path";
 import { readFile } from "fs/promises";
 import {currentRoot} from './tree'
-async function generateAndVerifyProof() {
+import { getPathElements,getPathIndices } from "./tree";
+async function generateAndVerifyProof(index: number ) {
   // Field modulus conversion
   const fieldModulus = BigInt("21888242871839275222246405745257275088548364400416034343698204186575808495617");
   const merkleRoot: bigint= BigInt(currentRoot())
   console.log("Current Merkle Root:", merkleRoot.toString());
-  // Input data with explicit types
   const input = {
     oldRoot: merkleRoot.toString(),  
     newRoot: merkleRoot.toString(),  
@@ -63,19 +63,8 @@ async function generateAndVerifyProof() {
     margin: (BigInt(-100) + fieldModulus).toString(),
     entryFunding: 5,
     cumFunding: 0,  
-    pathElements: [
-    "15215956860192754867003942406872706015577979927073229954434143459039467021244",
-    "10767976081731991724067408705540702443536110808973284358838706009676048757543",
-    "7423237065226347324353380772367382631490014989348495481811164164159255474657",
-    "11286972368698509976183087595462810875513684078608517520839298933882497716792",
-    "3607627140608796879659380071776844901612302623152076817094415224584923813162",
-    "19712377064642672829441595136074946683621277828620209496774504837737984048981",
-    "20775607673010627194014556968476266066927294572720319469184847051418138353016",
-    "3396914609616007258851405644437304192397291162432396347162513310381425243293",
-    "21551820661461729022865262380882070649935529853313286572328683688269863701601",
-    "6573136701248752079028194407151022595060682063033565181951145966236778420039"
-  ],
-  pathIndices: [0,0,0,0,0,0,0,0,0,0] 
+    pathElements: getPathElements(index),
+  pathIndices: getPathIndices(index) 
   };
 
   // Resolve paths with type safety
@@ -92,17 +81,17 @@ async function generateAndVerifyProof() {
     console.log("Public Signals:", publicSignals);
 
     // 2. Load verification key with proper typing
-    const vkeyData = await readFile(vkeyPath, "utf-8");
-    const verificationKey: Groth16VerificationKey = JSON.parse(vkeyData);
+    // const vkeyData = await readFile(vkeyPath, "utf-8");
+    // const verificationKey: Groth16VerificationKey = JSON.parse(vkeyData);
     
-    // 3. Verify proof with correct structure
-    const verifyResult = await verify(verificationKey, {
-      proof,
-      publicSignals
-    });
+    // // 3. Verify proof with correct structure
+    // const verifyResult = await verify(verificationKey, {
+    //   proof,
+    //   publicSignals
+    // });
     
-    console.log("Verification Result:", verifyResult);
-    return verifyResult;
+    // console.log("Verification Result:", verifyResult);
+    // return verifyResult;
     
   } catch (error) {
     console.error("Proof operation failed:", error instanceof Error ? error.message : error);
@@ -123,4 +112,4 @@ interface Groth16VerificationKey {
   IC: [string, string][];
 }
 
-generateAndVerifyProof();
+generateAndVerifyProof(0);

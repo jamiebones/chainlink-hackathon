@@ -54,3 +54,26 @@ export function deletePosition(hash: bigint){
 }
 // deletePosition(15215956860192754867003942406872706015577979927073229954434143459039467021244n)
 // console.log(tree)
+
+// const proof = tree.createProof(0)
+// console.log("Proof:", proof);
+
+export function getPathIndices(index: number): number[] {
+  const proof = tree.createProof(index);
+  return proof.pathIndices;
+}
+
+export function getPathElements(index: number): bigint[] {
+  const proof = tree.createProof(index);
+  const elements= proof.siblings
+  let pathElements: bigint[] = [];
+  for (let i = 0; i < elements.length; i++) {
+    pathElements.push(elements[i].toString());
+}
+  return pathElements;
+}
+
+const elements =getPathElements(0)
+console.log("Path Elements:", elements);
+const indices =getPathIndices(0)
+console.log("Path Indices:", indices);
