@@ -1,9 +1,7 @@
 "use strict";
-// import { groth16 }  from 'snarkjs';
-// import { readFileSync } from 'fs';
-// import path from 'path';
-// import { perpZK } from './contracts.js';
-// import { Leaf }   from './tree.js';
+// import { prove, verify } from "@zk-kit/groth16";
+// import { resolve } from "path";
+// import { getPathElements, getPathIndices, currentRoot } from "./tree";
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -41,57 +39,76 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
     }
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-// const wasmPath = path.resolve('circuits/build/liquidate_js/liquidate.wasm');
-// const zkeyPath = path.resolve('circuits/build/circuit_0000.zkey');
-// export async function proveAndLiquidate(
-//   trader: string,
-//   assetId: number,
-//   price: bigint,      // ◀ future use
-//   root:  bigint,
-//   leaf:  Leaf
-// ) {
-//   const input: any = {
-//     oldRoot:      root.toString(),
-//     newRoot:      root.toString(),   // MVP: no deletion
-//     size:         leaf.size.toString(),
-//     margin:       leaf.margin.toString(),
-//     entryFunding: leaf.entryFunding.toString(),
-//     cumFunding:   '0',
-//     pathElements: Array(20).fill('0'),
-//     pathIndices:  Array(20).fill('0')
-//   };
-//   const { proof, publicSignals } = await groth16.fullProve(
-//     input,
-//     wasmPath,
-//     zkeyPath
-//   );
-//   await perpZK.verifyAndLiquidate(
-//     assetId,
-//     publicSignals[0],
-//     publicSignals[1],
-//     trader,
-//     leaf.size,
-//     leaf.margin,
-//     leaf.entryFunding,
-//     proof,
-//     { gasLimit: 600_000 }
-//   );
+// function formatProofForSolidity(proof: any, publicSignals: string[] | number[]) {
+//   const a = [proof.pi_a[0].toString(), proof.pi_a[1].toString()];
+//   const b = [
+//     [proof.pi_b[0][1].toString(), proof.pi_b[0][0].toString()],
+//     [proof.pi_b[1][1].toString(), proof.pi_b[1][0].toString()]
+//   ];
+//   const c = [proof.pi_c[0].toString(), proof.pi_c[1].toString()];
+//   const input = publicSignals.map(x => x.toString());
+//   console.log("----- Solidity inputs for verifier (decimal) -----\n");
+//   console.log("a:", JSON.stringify(a));
+//   console.log("b:", JSON.stringify(b));
+//   console.log("c:", JSON.stringify(c));
+//   console.log("input:", JSON.stringify(input));
+//   // Also log as hex for convenience
+//   const toHex = (x: string) => '0x' + BigInt(x).toString(16);
+//   console.log("----- inputs in hex format -----\n");
+//   console.log("a:", JSON.stringify(a.map(toHex)));
+//   console.log("b:", JSON.stringify(b.map(pair => pair.map(toHex))));
+//   console.log("c:", JSON.stringify(c.map(toHex)));
+//   console.log("input:", JSON.stringify(input.map(toHex)));
+//   console.log("\n-----------------------------------------------\n");
+//   return { a, b, c, input };
 // }
-// proof.ts
+// async function generateAndVerifyProof(index: number) {
+//   const fieldModulus = BigInt("21888242871839275222246405745257275088548364400416034343698204186575808495617");
+//   const merkleRoot: bigint = BigInt(currentRoot());
+//   const input = {
+//     oldRoot: merkleRoot.toString(),
+//     newRoot: merkleRoot.toString(),
+//     size: 3,
+//     margin: (BigInt(-100) + fieldModulus).toString(),
+//     entryFunding: 5,
+//     cumFunding: 0,
+//     pathElements: getPathElements(index),
+//     pathIndices: getPathIndices(index)
+//   };
+//   const baseDir = resolve(__dirname, "../../circuits-synth/outputs");
+//   const wasmPath = resolve(baseDir, "liquidate_js/liquidate.wasm");
+//   const zkeyPath = resolve(baseDir, "liquidate_final.zkey");
+//   const vkeyPath = resolve(baseDir, "verification_key.json");
+//   try {
+//     const { proof, publicSignals } = await prove(input, wasmPath, zkeyPath);
+//     const { a, b, c, input: inputArr } = formatProofForSolidity(proof, publicSignals);
+//   } catch (error) {
+//     console.error("Proof operation failed:", error instanceof Error ? error.message : error);
+//     process.exit(1);
+//   }
+// }
+// generateAndVerifyProof(0);
 var groth16_1 = require("@zk-kit/groth16");
 var path_1 = require("path");
-var promises_1 = require("fs/promises");
 var tree_1 = require("./tree");
-var tree_2 = require("./tree");
+function formatProofForSolidity(proof, publicSignals) {
+    var a = [proof.pi_a[0].toString(), proof.pi_a[1].toString()];
+    var b = [
+        [proof.pi_b[0][1].toString(), proof.pi_b[0][0].toString()],
+        [proof.pi_b[1][1].toString(), proof.pi_b[1][0].toString()]
+    ];
+    var c = [proof.pi_c[0].toString(), proof.pi_c[1].toString()];
+    var input = publicSignals.map(function (x) { return x.toString(); });
+    return { a: a, b: b, c: c, input: input };
+}
 function generateAndVerifyProof(index) {
     return __awaiter(this, void 0, void 0, function () {
-        var fieldModulus, merkleRoot, input, baseDir, wasmPath, zkeyPath, vkeyPath, _a, proof, publicSignals, vkeyData, verificationKey, verifyResult, error_1;
-        return __generator(this, function (_b) {
-            switch (_b.label) {
+        var fieldModulus, merkleRoot, input, baseDir, wasmPath, zkeyPath, _a, proof, publicSignals, _b, a, b, c, inputArr, error_1;
+        return __generator(this, function (_c) {
+            switch (_c.label) {
                 case 0:
                     fieldModulus = BigInt("21888242871839275222246405745257275088548364400416034343698204186575808495617");
                     merkleRoot = BigInt((0, tree_1.currentRoot)());
-                    console.log("Current Merkle Root:", merkleRoot.toString());
                     input = {
                         oldRoot: merkleRoot.toString(),
                         newRoot: merkleRoot.toString(),
@@ -99,39 +116,30 @@ function generateAndVerifyProof(index) {
                         margin: (BigInt(-100) + fieldModulus).toString(),
                         entryFunding: 5,
                         cumFunding: 0,
-                        pathElements: (0, tree_2.getPathElements)(index),
-                        pathIndices: (0, tree_2.getPathIndices)(index)
+                        pathElements: (0, tree_1.getPathElements)(index),
+                        pathIndices: (0, tree_1.getPathIndices)(index)
                     };
                     baseDir = (0, path_1.resolve)(__dirname, "../../circuits-synth/outputs");
                     wasmPath = (0, path_1.resolve)(baseDir, "liquidate_js/liquidate.wasm");
                     zkeyPath = (0, path_1.resolve)(baseDir, "liquidate_final.zkey");
-                    vkeyPath = (0, path_1.resolve)(baseDir, "verification_key.json");
-                    _b.label = 1;
+                    _c.label = 1;
                 case 1:
-                    _b.trys.push([1, 5, , 6]);
+                    _c.trys.push([1, 3, , 4]);
                     return [4 /*yield*/, (0, groth16_1.prove)(input, wasmPath, zkeyPath)];
                 case 2:
-                    _a = _b.sent(), proof = _a.proof, publicSignals = _a.publicSignals;
-                    console.log("Generated Proof:", JSON.stringify(proof, null, 2));
-                    console.log("Public Signals:", publicSignals);
-                    return [4 /*yield*/, (0, promises_1.readFile)(vkeyPath, "utf-8")];
+                    _a = _c.sent(), proof = _a.proof, publicSignals = _a.publicSignals;
+                    _b = formatProofForSolidity(proof, publicSignals), a = _b.a, b = _b.b, c = _b.c, inputArr = _b.input;
+                    console.log("a is", a);
+                    console.log("b is", b);
+                    console.log("c is", c);
+                    console.log("input is", inputArr);
+                    return [3 /*break*/, 4];
                 case 3:
-                    vkeyData = _b.sent();
-                    verificationKey = JSON.parse(vkeyData);
-                    return [4 /*yield*/, (0, groth16_1.verify)(verificationKey, {
-                            proof: proof,
-                            publicSignals: publicSignals
-                        })];
-                case 4:
-                    verifyResult = _b.sent();
-                    console.log("Verification Result:", verifyResult);
-                    return [2 /*return*/, verifyResult];
-                case 5:
-                    error_1 = _b.sent();
+                    error_1 = _c.sent();
                     console.error("Proof operation failed:", error_1 instanceof Error ? error_1.message : error_1);
                     process.exit(1);
-                    return [3 /*break*/, 6];
-                case 6: return [2 /*return*/];
+                    return [3 /*break*/, 4];
+                case 4: return [2 /*return*/];
             }
         });
     });
