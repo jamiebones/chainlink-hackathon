@@ -11,15 +11,18 @@ interface IPerpEngine {
 }
 
 interface IVerifier {
-    function verify(bytes calldata proof, uint256[] calldata publicInputs) external view returns (bool);
+    function verifyProof(
+        uint[2] calldata a,
+        uint[2][2] calldata b,
+        uint[2] calldata c,
+        uint[1] calldata input
+    ) external view returns (bool);
 }
 
 /// @title Simple Privacy Layer for PerpEngine
 /// @notice Minimal ZK contract that only handles merkle roots and forwards net deltas to PerpEngine
 contract PerpEngineZk is ReentrancyGuard {
-    /*───────────────────
-        DATA STRUCTURES
-    ───────────────────*/
+
 
     struct Asset {
         bytes32 root;          // Poseidon Merkle root of trader positions
@@ -38,11 +41,6 @@ contract PerpEngineZk is ReentrancyGuard {
     IVerifier public verifier;
     IPerpEngine public immutable perpEngine;
     address public immutable owner;
-
-    /*───────────────────
-          EVENTS
-    ───────────────────*/
-
     event RootUpdated(uint8 indexed assetId, bytes32 oldRoot, bytes32 newRoot);
     event BatchProcessed(uint8[] assetIds, int256[] netDeltas, int256[] marginDeltas);
     event LiquidationVerified(address indexed trader, uint8 indexed assetId, int256 size);
@@ -64,9 +62,9 @@ contract PerpEngineZk is ReentrancyGuard {
         _;
     }
 
-    /*───────────────────
+    /*-------------------
        BATCH PROCESSING - Called by Executor Bot
-    ───────────────────*/
+    -------------------*/
 
     /**
      * @notice Process batch of private trades
@@ -108,66 +106,33 @@ contract PerpEngineZk is ReentrancyGuard {
         emit RootUpdated(assetId, oldRoot, newRoot);
     }
 
-    /*───────────────────
+    /*-------------------
        ZK LIQUIDATION
-    ───────────────────*/
+    -------------------*/
 
-    /**
-     * @notice Verify ZK proof for liquidation and forward to PerpEngine
-     * @param assetId Asset being liquidated
-     * @param oldRoot Current merkle root
-     * @param newRoot New merkle root after liquidation
-     * @param trader Trader being liquidated
-     * @param size Position size being liquidated
-     * @param margin Trader's margin
-     * @param entryFunding Trader's entry funding rate
-     * @param proof ZK-SNARK proof of liquidation eligibility
-     */
     function verifyAndLiquidate(
-        uint8   assetId,
-        bytes32 oldRoot,
-        bytes32 newRoot,
-        address trader,
-        int256  size,
-        uint256 margin,
-        uint256 entryFunding,
-        bytes calldata proof
-    ) external nonReentrant {
-        Asset storage a = asset[assetId];
-        require(a.root == oldRoot, "stale root");
+    uint8 assetId,
+    bytes32 oldRoot,
+    bytes32 newRoot,
+    address trader,
+    int256 size,
+    uint256 margin,
+    uint256 entryFunding,
+    uint[2] calldata a,
+    uint[2][2] calldata b,
+    uint[2] calldata c,
+    uint[1] calldata publicInputs
+) external nonReentrant {
+    Asset storage a_ = asset[assetId];
+    require(a_.root == oldRoot, "stale root");
+    require(verifier.verifyProof(a, b, c, publicInputs), "invalid proof");
+    a_.root = newRoot;
+    a_.lastUpdate = uint40(block.timestamp);
+    perpEngine.liquidateFromZK(trader, assetId);
+    emit RootUpdated(assetId, oldRoot, newRoot);
+    emit LiquidationVerified(trader, assetId, size);
+}
 
-        // Build public inputs for ZK verification
-        uint256[6] memory publicInputs;
-        publicInputs[0] = uint256(oldRoot);
-        publicInputs[1] = uint256(newRoot);
-        publicInputs[2] = size < 0 ? uint256(-size) : uint256(size);
-        publicInputs[3] = margin;
-        publicInputs[4] = entryFunding;
-        publicInputs[5] = uint256(uint160(trader)); // Include trader address
-
-        // Convert to dynamic array for verifier
-        uint256[] memory pubIns = new uint256[](6);
-        for (uint256 i = 0; i < 6; ++i) {
-            pubIns[i] = publicInputs[i];
-        }
-
-        // Verify ZK proof
-        require(verifier.verify(proof, pubIns), "invalid proof");
-
-        // Update merkle root
-        a.root = newRoot;
-        a.lastUpdate = uint40(block.timestamp);
-
-        // Forward liquidation to PerpEngine (it handles all liquidation logic)
-        perpEngine.liquidateFromZK(trader, assetId);
-
-        emit RootUpdated(assetId, oldRoot, newRoot);
-        emit LiquidationVerified(trader, assetId, size);
-    }
-
-    /*───────────────────
-          VIEW FUNCTIONS
-    ───────────────────*/
 
     function getCurrentRoot(uint8 assetId) external view returns (bytes32) {
         return asset[assetId].root;
@@ -177,10 +142,6 @@ contract PerpEngineZk is ReentrancyGuard {
         Asset storage a = asset[assetId];
         return (a.root, a.lastUpdate);
     }
-
-    /*───────────────────
-          ADMIN FUNCTIONS
-    ───────────────────*/
 
     function initializeAsset(uint8 assetId, bytes32 initialRoot) external onlyOwner {
         asset[assetId].root = initialRoot;
