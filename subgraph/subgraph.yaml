@@ -6,9 +6,9 @@ dataSources:
     name: Vault
     network: fuji
     source:
-      address: "0x999927B5EBb9B70Fa65Eba728f319C7C609530F4"
+      address: "0x561B0fcC18D09dBa76c68Fa0910AcFf58A1EF6E2"
       abi: Vault
-      startBlock: 41989204  # REPLACE WITH ACTUAL DEPLOYMENT BLOCK
+      startBlock: 42498578
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -31,10 +31,6 @@ dataSources:
           handler: handleVaultClosed
         - event: UserWithdrawal(indexed address,uint256,uint8)
           handler: handleUserWithdrawal
-        - event: PositionCreated(indexed address,uint256,uint256,uint256,uint256,indexed uint256,uint256,uint8)
-          handler: handlePositionCreated
-        - event: PositionClosed(indexed address,uint256,uint256,uint256,uint256,uint8)
-          handler: handlePositionClosed
         - event: FundingSettled(indexed uint8,int256,uint256)
           handler: handleFundingSettled
         - event: MintFeeCollected(indexed address,uint256)
@@ -43,4 +39,63 @@ dataSources:
           handler: handleRedemptionFeeCollected
         - event: PerpEngineUpdated(address)
           handler: handlePerpEngineUpdated
+      file: ./src/mapping.ts
+
+  - kind: ethereum
+    name: PerpEngine
+    network: fuji
+    source:
+      address: "0x2c59F4032B279344491684e5d752d8cf1e5AE15a" # <<< REPLACE ME
+      abi: PerpEngine
+      startBlock: 42498588 
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - PerpPosition
+        - PerpFundingUpdate
+        - PerpLiquidation
+        - VaultHedge
+      abis:
+        - name: PerpEngine
+          file: ./abis/PerpEngine.json
+      eventHandlers:
+        - event: PositionOpened(address,uint8,uint256,uint256,uint256,bool)
+          handler: handlePerpPositionOpened
+        - event: PositionClosed(indexed address,uint8,uint256,uint256,int256)
+          handler: handlePerpPositionClosed
+        - event: PositionLiquidated(indexed address,uint8,uint256,uint256)
+          handler: handlePerpPositionLiquidated
+        - event: FundingUpdated(indexed uint8,int256,int256)
+          handler: handlePerpFundingUpdated
+        - event: CollateralAdded(indexed address,uint8,uint256)
+          handler: handlePerpCollateralAdded
+        - event: CollateralWithdrawn(indexed address,indexed uint8,uint256,uint256)
+          handler: handlePerpCollateralWithdrawn
+        - event: VaultHedgeOpened(indexed address,uint8,uint256)
+          handler: handleVaultHedgeOpened
+        - event: VaultHedgeClosed(indexed address,indexed uint8,uint256)
+          handler: handleVaultHedgeClosed
+      file: ./src/mapping.ts
+
+  - kind: ethereum
+    name: ReceiverContract
+    network: fuji
+    source:
+      address: "0x60D5A7f7f49D307e36AadAd994EF2e164a42BA54" # <<< REPLACE ME
+      abi: ReceiverContract
+      startBlock: 42498583
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - CCIPMessage
+      abis:
+        - name: ReceiverContract
+          file: ./abis/ReceiverContract.json
+      eventHandlers:
+        - event: MessageReceived(indexed bytes32,indexed uint64,indexed address,bytes,address,uint256)
+          handler: handleMessageReceived
       file: ./src/mapping.ts

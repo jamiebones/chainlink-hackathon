@@ -1,0 +1,103 @@
+# Example GraphQL queries for the subgraph
+
+# 1. Query Active Vaults for a Specific Trader
+# Replace 0xTRADER_ADDRESS with the actual trader's address.
+query GetTraderActiveVaults {
+  vaults(where: { trader: "0xTRADER_ADDRESS", isActive: true }) {
+    id
+    positionId
+    assetType
+    mintedAmount
+    bufferCollateral
+    entryPrice
+    createdAt
+  }
+}
+
+# 2. Query Open Perpetual Positions
+# Retrieves all perpetual positions that are currently in an "Open" state.
+query GetOpenPerpPositions {
+  perpPositions(where: { status: "Open" }, orderBy: openedAt, orderDirection: desc) {
+    id
+    user
+    asset
+    sizeUsd
+    collateral
+    entryPrice
+    isLong
+    openedAt
+  }
+}
+
+# 3. Query CCIP Message History
+# Fetches the 10 most recent CCIP messages, both successful and failed.
+query GetCCIPHistory {
+  received: ccipMessages(first: 10, orderBy: timestamp, orderDirection: desc) {
+    id
+    messageId
+    sourceChainSelector
+    status
+    timestamp
+  }
+  failed: ccipMessageFaileds(first: 10, orderBy: timestamp, orderDirection: desc) {
+    id
+    messageId
+    reason
+    timestamp
+  }
+}
+
+# 4. Query a Specific CCIP Message by ID
+# Replace 0xMESSAGE_ID with the actual message ID to check its status.
+query GetCCIPMessageStatus {
+  ccipMessage(id: "0xMESSAGE_ID") {
+    id
+    status
+    timestamp
+  }
+  ccipMessageFailed(id: "0xMESSAGE_ID") {
+    id
+    reason
+    timestamp
+  }
+}
+
+# 5. Query Global Protocol Metrics
+# Fetches the singleton ProtocolMetric entity for total buffer and debt.
+query GetProtocolMetrics {
+  protocolMetric(id: "global") {
+    totalTSLABuffer
+    totalAPPLBuffer
+    totalTSLADebt
+    totalAPPLDebt
+  }
+}
+
+# 6. Query Recent Liquidations
+# Fetches the 5 most recent perpetual position liquidations.
+query GetRecentLiquidations {
+  perpLiquidations(first: 5, orderBy: timestamp, orderDirection: desc) {
+    id
+    liquidator
+    user
+    penalty
+    timestamp
+    position {
+      id
+      asset
+      sizeUsd
+    }
+  }
+}
+
+# 7. Query Vault Hedge Positions
+# Shows the current size and collateral of the vault's hedges for each asset.
+query GetVaultHedges {
+  vaultHedges {
+    id
+    asset
+    sizeUsd
+    collateral
+    lastUpdatedAt
+  }
+} 
