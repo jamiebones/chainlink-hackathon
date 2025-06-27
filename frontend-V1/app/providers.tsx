@@ -12,21 +12,44 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { ReactNode } from 'react';
 
+// ✅ Define custom Fuji (Avalanche C-Chain Testnet)
+export const fuji: Chain = {
+  id: 43113,
+  name: 'Avalanche Fuji',
+  nativeCurrency: {
+    name: 'Avalanche',
+    symbol: 'AVAX',
+    decimals: 18,
+  },
+  rpcUrls: {
+    default: {
+      http: ['https://api.avax-test.network/ext/bc/C/rpc'],
+    },
+    public: {
+      http: ['https://api.avax-test.network/ext/bc/C/rpc'],
+    },
+  },
+  blockExplorers: {
+    default: {
+      name: 'SnowTrace',
+      url: 'https://testnet.snowtrace.io/',
+    },
+  },
+};
+
 export default function Providers({ children }: { children: ReactNode }) {
-  const [config, setConfig] = useState<ReturnType<typeof getDefaultConfig> | null>(null);
+  //const [config, setConfig] = useState<ReturnType<typeof getDefaultConfig> | null>(null);
   const [queryClient] = useState(() => new QueryClient());
 
-  useEffect(() => {
+ 
     const config = getDefaultConfig({
       appName: 'sTSLA Hackathon App',
       projectId: 'e872ba5075a2eb7e208dcaeb0bd70e37',
       chains: [avalanche, avalancheFuji,arbitrum, arbitrumSepolia],
       ssr: false,
     });
-    setConfig(config);
-  }, []);
-
-  if (!config) return null;
+   
+ 
 
   return (
     <WagmiProvider config={config}>
