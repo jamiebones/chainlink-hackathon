@@ -1,13 +1,11 @@
-// close-executor.ts
+// FIXED CLOSE EXECUTOR - PROPER MARGIN RELEASE
+// Key changes marked with 🔧
+
 import { cryptoManager, ClosePositionPayload, EncryptedData } from './crypto';
 import { database, Position } from './database';
 import { feeCalculator } from './fees';
 import { merkleTree } from './merkle';
 import { contractManager } from './contracts';
-
-// ====================================================================
-// CLOSE TRADE EXECUTOR - POSITION CLOSING & PNL MANAGEMENT
-// ====================================================================
 
 export interface ProcessedClose {
   closeId: string;
@@ -18,7 +16,7 @@ export interface ProcessedClose {
   marketData: {
     entryPrice: bigint;
     currentPrice: bigint;
-    priceChange: number; // Percentage
+    priceChange: number;
   };
   pnl: {
     unrealizedPnL: bigint;
@@ -30,6 +28,12 @@ export interface ProcessedClose {
     closeSize: bigint;
     remainingSize: bigint;
     isFullClose: boolean;
+  };
+  // 🔧 Add margin tracking for proper balance management
+  margin: {
+    originalMargin: bigint;
+    marginToRelease: bigint;
+    remainingMargin: bigint;
   };
   isValid: boolean;
   errors?: string[];
@@ -77,29 +81,22 @@ export class CloseTradeExecutor {
   private closeCounter = 0;
   private batchCounter = 0;
   
-  // Configuration
-  private readonly BATCH_SIZE = 3; // Process every 3 closes
-  private readonly BATCH_TIMEOUT = 20000; // Or every 20 seconds
+  private readonly BATCH_SIZE = 3;
+  private readonly BATCH_TIMEOUT = 20000;
   private batchTimer: NodeJS.Timeout | null = null;
 
   constructor() {
     console.log('🔄 Close Trade Executor initializing...');
-    
-    // Start batch timer
     this.startBatchTimer();
-    
     console.log('✅ Close Trade Executor initialized');
     console.log(`⚙️ Close batch size: ${this.BATCH_SIZE} operations`);
     console.log(`⏰ Close batch timeout: ${this.BATCH_TIMEOUT / 1000}s`);
   }
 
   // ====================================================================
-  // CLOSE PROCESSING
+  // 🔧 FIXED CLOSE PROCESSING - PROPER MARGIN HANDLING
   // ====================================================================
 
-  /**
-   * Process encrypted close request
-   */
   async processEncryptedClose(encryptedData: EncryptedData): Promise<ProcessedClose> {
     const closeId = this.generateCloseId();
     console.log(`\n🔄 Processing encrypted close: ${closeId}`);
@@ -128,8 +125,8 @@ export class CloseTradeExecutor {
         return this.createFailedClose(closeId, pnlResult.error!, payload);
       }
 
-      // Step 4: Process the close (update position and balance)
-      const closeResult = await this.executeClose(position!, payload, pnlResult.data!);
+      // 🔧 Step 4: NEW CLEAN FLOW - Process close with proper margin handling
+      const closeResult = await this.executeCloseWithMarginHandling(position!, payload, pnlResult.data!);
       if (!closeResult.success) {
         return this.createFailedClose(closeId, closeResult.error!, payload);
       }
@@ -144,6 +141,8 @@ export class CloseTradeExecutor {
         marketData: pnlResult.data!.marketData,
         pnl: pnlResult.data!.pnl,
         position: pnlResult.data!.position,
+        // 🔧 Add margin tracking
+        margin: closeResult.marginData!,
         isValid: true,
         timestamp: Date.now()
       };
@@ -155,6 +154,7 @@ export class CloseTradeExecutor {
       console.log(`📊 ${payload.trader} closed ${payload.closePercent}% of asset ${payload.assetId}`);
       console.log(`💰 PnL: ${this.formatPnL(pnlResult.data!.pnl.unrealizedPnL)}`);
       console.log(`💸 Net payout: ${this.formatPnL(pnlResult.data!.pnl.netPayout)}`);
+      console.log(`🔓 Margin released: $${Number(closeResult.marginData!.marginToRelease)/1e6}`);
       console.log(`📋 Pending closes: ${this.pendingCloses.length}/${this.BATCH_SIZE}`);
 
       // Step 7: Check if we should process batch
@@ -172,16 +172,154 @@ export class CloseTradeExecutor {
   }
 
   // ====================================================================
-  // PNL CALCULATION
+  // 🔧 NEW CLOSE EXECUTION WITH PROPER MARGIN HANDLING
   // ====================================================================
 
-  /**
-   * Calculate current PnL for user positions
-   */
+  private async executeCloseWithMarginHandling(
+    position: Position,
+    payload: ClosePositionPayload,
+    pnlData: any
+  ): Promise<{ 
+    success: boolean; 
+    error?: string;
+    marginData?: {
+      originalMargin: bigint;
+      marginToRelease: bigint;
+      remainingMargin: bigint;
+    };
+  }> {
+    try {
+      const isFullClose = payload.closePercent >= 100;
+      
+      // 🔧 Calculate margin allocation
+      const originalMargin = position.margin;
+      const marginToRelease = isFullClose 
+        ? originalMargin 
+        : (originalMargin * BigInt(payload.closePercent)) / 100n;
+      const remainingMargin = originalMargin - marginToRelease;
+
+      console.log(`💰 Margin calculation:`);
+      console.log(`   Original margin: $${Number(originalMargin)/1e6}`);
+      console.log(`   Margin to release: $${Number(marginToRelease)/1e6}`);
+      console.log(`   Remaining margin: $${Number(remainingMargin)/1e6}`);
+
+      // 🔧 Step 1: Unlock the margin portion being closed
+      const marginUnlocked = database.unlockBalance(payload.trader, marginToRelease);
+      if (!marginUnlocked) {
+        return { success: false, error: 'Failed to unlock position margin' };
+      }
+      console.log(`🔓 Unlocked $${Number(marginToRelease)/1e6} margin`);
+
+      // 🔧 Step 2: Add PnL to available balance (can be positive or negative)
+      const pnlAdded = database.addBalance(payload.trader, pnlData.pnl.netPayout);
+      if (!pnlAdded) {
+        // Rollback margin unlock
+        database.lockBalance(payload.trader, marginToRelease);
+        return { success: false, error: 'Failed to add PnL to balance' };
+      }
+      console.log(`💰 Added PnL: ${this.formatPnL(pnlData.pnl.netPayout)}`);
+
+      // 🔧 Step 3: Update or remove position
+      let positionUpdated: boolean;
+      
+      if (isFullClose) {
+        // Full close: remove position entirely
+        positionUpdated = this.removePosition(payload.trader, payload.assetId);
+        console.log(`🗑️ Position fully closed and removed`);
+      } else {
+        // Partial close: update position size and margin
+        const updatedPosition: Position = {
+          ...position,
+          size: pnlData.position.remainingSize,
+          margin: remainingMargin, // 🔧 Update margin to remaining amount
+          lastUpdate: Date.now()
+        };
+        positionUpdated = this.updatePosition(updatedPosition);
+        console.log(`📏 Position partially closed and updated`);
+      }
+      
+      if (!positionUpdated) {
+        // Rollback balance changes
+        database.addBalance(payload.trader, 0n - pnlData.pnl.netPayout); // 🔧 Fix bigint negation
+        database.lockBalance(payload.trader, marginToRelease);
+        return { success: false, error: 'Failed to update position' };
+      }
+
+      // 🔧 Step 4: Verify final balance state
+      const finalBalance = database.getUserBalance(payload.trader);
+      console.log(`✅ Final balance state:`);
+      console.log(`   Available: $${Number(finalBalance.available)/1e6}`);
+      console.log(`   Locked: $${Number(finalBalance.locked)/1e6}`);
+      console.log(`   Total: $${Number(finalBalance.total)/1e6}`);
+
+      return { 
+        success: true,
+        marginData: {
+          originalMargin,
+          marginToRelease,
+          remainingMargin
+        }
+      };
+      
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Close execution failed' 
+      };
+    }
+  }
+
+  // ====================================================================
+  // 🔧 IMPROVED POSITION MANAGEMENT
+  // ====================================================================
+
+  private updatePosition(position: Position): boolean {
+    try {
+      // Save to database
+      database.savePosition(position);
+      
+      // Update in merkle tree
+      merkleTree.updatePosition(position);
+      
+      console.log(`📊 Position updated: ${position.trader} asset ${position.assetId}`);
+      console.log(`   New size: ${this.formatPosition(position)}`);
+      console.log(`   New margin: $${Number(position.margin)/1e6}`);
+      
+      return true;
+    } catch (error) {
+      console.error('Failed to update position:', error);
+      return false;
+    }
+  }
+
+  private removePosition(trader: string, assetId: number): boolean {
+    try {
+      // Remove from database
+      const key = `${trader.toLowerCase()}-${assetId}`;
+      const dbData = (database as any).data;
+      if (dbData.positions[key]) {
+        delete dbData.positions[key];
+        (database as any).saveToBackup();
+      }
+      
+      // Remove from merkle tree (sets to zero)
+      merkleTree.removePosition(trader, assetId);
+      
+      console.log(`🗑️ Position fully closed and removed: ${trader} asset ${assetId}`);
+      return true;
+    } catch (error) {
+      console.error('Failed to remove position:', error);
+      return false;
+    }
+  }
+
+  // ====================================================================
+  // PNL CALCULATION (UNCHANGED)
+  // ====================================================================
+
   async calculateCurrentPnL(trader: string, assetId?: number): Promise<PnLCalculation> {
     console.log(`📊 Calculating PnL for trader: ${trader}${assetId !== undefined ? ` asset: ${assetId}` : ''}`);
     
-    // Get user positions
     const positions = assetId !== undefined 
       ? database.getTraderPositions(trader).filter(p => p.assetId === assetId)
       : database.getTraderPositions(trader);
@@ -243,9 +381,6 @@ export class CloseTradeExecutor {
     };
   }
 
-  /**
-   * Calculate PnL for a single position
-   */
   async calculatePositionPnL(position: Position): Promise<{
     currentPrice: bigint;
     unrealizedPnL: bigint;
@@ -261,10 +396,8 @@ export class CloseTradeExecutor {
     // Calculate unrealized PnL
     let unrealizedPnL: bigint;
     if (isLong) {
-      // Long: profit when price goes up
       unrealizedPnL = (absSize * (currentPrice - position.entryPrice)) / position.entryPrice;
     } else {
-      // Short: profit when price goes down
       unrealizedPnL = (absSize * (position.entryPrice - currentPrice)) / position.entryPrice;
     }
     
@@ -290,9 +423,6 @@ export class CloseTradeExecutor {
     };
   }
 
-  /**
-   * Calculate detailed PnL for closing operations
-   */
   private async calculateDetailedPnL(
     position: Position, 
     closePercent: number
@@ -383,99 +513,7 @@ export class CloseTradeExecutor {
   }
 
   // ====================================================================
-  // CLOSE EXECUTION
-  // ====================================================================
-
-  private async executeClose(
-    position: Position,
-    payload: ClosePositionPayload,
-    pnlData: any
-  ): Promise<{ success: boolean; error?: string }> {
-    try {
-      // Step 1: Update user balance with PnL
-      const balanceSuccess = database.addBalance(payload.trader, pnlData.pnl.netPayout);
-      if (!balanceSuccess) {
-        return { success: false, error: 'Failed to update user balance with PnL' };
-      }
-      
-      // Step 2: Update position size or remove position
-      let positionSuccess: boolean;
-      
-      if (pnlData.position.isFullClose) {
-        // Full close: remove position entirely
-        positionSuccess = this.removePosition(payload.trader, payload.assetId);
-      } else {
-        // Partial close: update position size
-        positionSuccess = this.updatePositionSize(
-          payload.trader, 
-          payload.assetId, 
-          pnlData.position.remainingSize
-        );
-      }
-      
-      if (!positionSuccess) {
-        // Rollback balance change
-        database.addBalance(payload.trader, BigInt(-pnlData.pnl.netPayout));
-        return { success: false, error: 'Failed to update position' };
-      }
-      
-      console.log(`✅ Close executed: ${pnlData.position.isFullClose ? 'Full' : 'Partial'} close completed`);
-      return { success: true };
-      
-    } catch (error) {
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Close execution failed' 
-      };
-    }
-  }
-
-  private removePosition(trader: string, assetId: number): boolean {
-    try {
-      // Remove from database
-      const key = `${trader.toLowerCase()}-${assetId}`;
-      const dbData = (database as any).data;
-      if (dbData.positions[key]) {
-        delete dbData.positions[key];
-        (database as any).saveToBackup();
-      }
-      
-      // Remove from merkle tree (sets to zero)
-      merkleTree.removePosition(trader, assetId);
-      
-      console.log(`🗑️ Position fully closed and removed: ${trader} asset ${assetId}`);
-      return true;
-    } catch (error) {
-      console.error('Failed to remove position:', error);
-      return false;
-    }
-  }
-
-  private updatePositionSize(trader: string, assetId: number, newSize: bigint): boolean {
-    try {
-      const position = database.getPosition(trader, assetId);
-      if (!position) return false;
-      
-      // Update position with new size
-      const updatedPosition: Position = {
-        ...position,
-        size: newSize,
-        lastUpdate: Date.now()
-      };
-      
-      database.savePosition(updatedPosition);
-      merkleTree.updatePosition(updatedPosition);
-      
-      console.log(`📏 Position size updated: ${trader} asset ${assetId} new size: ${this.formatUSDC(newSize < 0n ? -newSize : newSize)}`);
-      return true;
-    } catch (error) {
-      console.error('Failed to update position size:', error);
-      return false;
-    }
-  }
-
-  // ====================================================================
-  // CLOSE VALIDATION
+  // VALIDATION (UNCHANGED)
   // ====================================================================
 
   private async validateCloseRequest(payload: ClosePositionPayload): Promise<{
@@ -485,7 +523,6 @@ export class CloseTradeExecutor {
   }> {
     const errors: string[] = [];
 
-    // Basic validation
     if (!payload.trader || !payload.trader.startsWith('0x')) {
       errors.push('Invalid trader address');
     }
@@ -498,25 +535,21 @@ export class CloseTradeExecutor {
       errors.push('Invalid close percent (must be 1-100)');
     }
 
-    // Check if position exists
     const position = database.getPosition(payload.trader, payload.assetId);
     if (!position) {
       errors.push('Position not found');
       return { isValid: false, errors };
     }
 
-    // Check if position has size
     if (position.size === 0n) {
       errors.push('Position has zero size');
     }
 
-    // Check request age
     const requestAge = Date.now() - payload.timestamp;
-    if (requestAge > 120000) { // 2 minutes
+    if (requestAge > 120000) {
       errors.push(`Close request too old: ${Math.floor(requestAge/1000)}s > 120s`);
     }
 
-    // Check if asset is paused
     try {
       const isPaused = await contractManager.isAssetPaused(payload.assetId);
       if (isPaused) {
@@ -534,7 +567,7 @@ export class CloseTradeExecutor {
   }
 
   // ====================================================================
-  // BATCH PROCESSING WITH CONTRACT INTEGRATION
+  // BATCH PROCESSING WITH CONTRACT INTEGRATION (UNCHANGED)
   // ====================================================================
 
   async processCloseBatch(): Promise<CloseBatchResult | null> {
@@ -551,23 +584,18 @@ export class CloseTradeExecutor {
     this.pendingCloses = [];
 
     try {
-      // Step 1: Calculate net deltas for contract submission
       const contractDeltas = this.calculateContractDeltas(closes);
-      
-      // Step 2: Submit to contract (which will call applyNetDelta with negative margins)
       const txHash = await this.submitCloseBatchToContract(contractDeltas);
       
-      // Step 3: Contract releases funds to executor via pool.releaseTo(executor, amount)
       console.log(`💰 Contract released funds to executor via transaction: ${txHash}`);
       
-      // Calculate totals for result
       const totalPnL = closes.reduce((sum, close) => sum + close.pnl.unrealizedPnL, 0n);
       const totalFees = closes.reduce((sum, close) => sum + close.pnl.closingFees, 0n);
       const totalPayout = closes.reduce((sum, close) => sum + close.pnl.netPayout, 0n);
       const affectedAssets = [...new Set(closes.map(c => c.assetId))];
 
       const oldRoot = merkleTree.getCurrentRootHex();
-      const newRoot = merkleTree.getCurrentRootHex(); // Already updated during individual closes
+      const newRoot = merkleTree.getCurrentRootHex();
 
       const result: CloseBatchResult = {
         batchId,
@@ -591,10 +619,8 @@ export class CloseTradeExecutor {
     } catch (error) {
       console.error(`❌ Close batch ${batchId} failed:`, error);
       
-      // Rollback: Add closes back to pending
       this.pendingCloses.unshift(...closes);
       
-      // TODO: Rollback individual close operations if needed
       console.log('⚠️ Individual closes already processed - may need manual reconciliation');
       
       return {
@@ -618,10 +644,6 @@ export class CloseTradeExecutor {
     }
   }
 
-  // ====================================================================
-  // CONTRACT INTEGRATION METHODS
-  // ====================================================================
-
   private calculateContractDeltas(closes: ProcessedClose[]): Map<number, {
     netQtyDelta: bigint;
     netMarginDelta: bigint;
@@ -644,15 +666,12 @@ export class CloseTradeExecutor {
       const data = deltas.get(close.assetId)!;
       
       // NEGATIVE qty delta (removing position)
-      data.netQtyDelta += close.position.closeSize; // closeSize is already signed (negative for shorts)
+      data.netQtyDelta += close.position.closeSize;
       
-      // NEGATIVE margin delta (releasing funds)
-      // Release original margin + PnL payout
-      const marginToRelease = close.originalPosition.margin + close.pnl.netPayout;
-      data.netMarginDelta -= marginToRelease; // NEGATIVE = withdrawal
+      // 🔧 NEGATIVE margin delta (releasing funds) - use actual margin released
+      data.netMarginDelta -= close.margin.marginToRelease;
     }
 
-    // Log what we're sending to contract
     for (const [assetId, data] of deltas) {
       console.log(`   Asset ${assetId}:`);
       console.log(`     Qty delta: ${this.formatPnL(data.netQtyDelta)} (removing positions)`);
@@ -680,7 +699,7 @@ export class CloseTradeExecutor {
       
       assetIds.push(assetId);
       netDeltas.push(data.netQtyDelta);
-      marginDeltas.push(data.netMarginDelta); // NEGATIVE values trigger withdrawal
+      marginDeltas.push(data.netMarginDelta);
       oldRoots.push(contractRoot);
       newRoots.push(newRoot);
       
@@ -690,14 +709,12 @@ export class CloseTradeExecutor {
       console.log(`   Releasing: ${this.formatUSDC(-data.netMarginDelta)} to executor`);
     }
 
-    // This calls PerpEngineZK.processBatch → PerpEngine.applyNetDelta → pool.releaseTo(executor)
-    // The key is that negative marginDeltas trigger the withdrawal logic!
     const txHash = await contractManager.processBatch(
       assetIds,
       oldRoots,
       newRoots,
       netDeltas,
-      marginDeltas // NEGATIVE values = withdrawals!
+      marginDeltas
     );
     
     console.log(`✅ Contract will release funds to executor: ${txHash}`);
@@ -705,7 +722,7 @@ export class CloseTradeExecutor {
   }
 
   // ====================================================================
-  // BATCH TIMER
+  // UTILITIES
   // ====================================================================
 
   private startBatchTimer(): void {
@@ -722,10 +739,6 @@ export class CloseTradeExecutor {
       }
     }, this.BATCH_TIMEOUT);
   }
-
-  // ====================================================================
-  // UTILITIES
-  // ====================================================================
 
   private createFailedClose(
     closeId: string,
@@ -753,6 +766,12 @@ export class CloseTradeExecutor {
         closeSize: 0n,
         remainingSize: 0n,
         isFullClose: false
+      },
+      // 🔧 Add empty margin data for failed closes
+      margin: {
+        originalMargin: 0n,
+        marginToRelease: 0n,
+        remainingMargin: 0n
       },
       isValid: false,
       errors: [error],
@@ -788,28 +807,25 @@ export class CloseTradeExecutor {
     return `$${(Number(price) / 1e18).toFixed(2)}`;
   }
 
+  private formatPosition(position: Position): string {
+    const side = position.size > 0n ? 'LONG' : 'SHORT';
+    const size = position.size > 0n ? position.size : -position.size;
+    return `${side} $${(Number(size) / 1e6).toFixed(2)}`;
+  }
+
   // ====================================================================
   // PUBLIC QUERIES
   // ====================================================================
 
-  /**
-   * Get pending closes
-   */
   getPendingCloses(): ProcessedClose[] {
     return [...this.pendingCloses];
   }
 
-  /**
-   * Force close batch processing
-   */
   async forceCloseBatchProcessing(): Promise<CloseBatchResult | null> {
     console.log('🚀 Force processing close batch...');
     return await this.processCloseBatch();
   }
 
-  /**
-   * Get executor statistics
-   */
   getStats(): {
     pendingCloses: number;
     totalProcessed: number;
@@ -828,9 +844,6 @@ export class CloseTradeExecutor {
     };
   }
 
-  /**
-   * Clear all data (for testing)
-   */
   clear(): void {
     this.pendingCloses = [];
     this.closeCounter = 0;
@@ -845,5 +858,4 @@ export class CloseTradeExecutor {
   }
 }
 
-// Export singleton instance
 export const closeExecutor = new CloseTradeExecutor();
