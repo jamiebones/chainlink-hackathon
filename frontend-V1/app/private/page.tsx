@@ -11,7 +11,7 @@ import abiJson2 from '@/abis/MockERc20.json'
 import {useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 const usdcAbi = abiJson2.abi
 const UsdcAdd = '0xDD655EC06411cA3468E641A974d66804414Cb2A2'
-const ExAdd='0x14D24C79be77CD4fE8d544CAd5ab0b7b0aCd50Fe'
+const ExAdd = '0x14D24C79be77CD4fE8d544CAd5ab0b7b0aCd50Fe'
 const suite = new CipherSuite({
   kem: new DhkemX25519HkdfSha256(),
   kdf: new HkdfSha256(),
@@ -37,7 +37,59 @@ export default function PrivateTradePage() {
   const [depositAmount, setDepositAmount] = useState('');
   const [userBalance, setUserBalance] = useState<null | { total: string, available: string, locked: string }>(null); 
   const [balanceLoading, setBalanceLoading] = useState(true);
+  const [positions, setPositions] = useState([]);
+  const [positionsLoading, setPositionsLoading] = useState(true);
   const { address: userAddress } = useAccount();
+
+  const fetchPositions = async () => {
+    if (!userAddress) return;
+    setPositionsLoading(true);
+    try {
+      const res = await fetch(`http://localhost:8080/position/${userAddress}`);
+      const json = await res.json();
+      if (json.success && json.positions) {
+        setPositions(json.positions);
+      }
+    } catch (err) {
+      console.error('❌ Failed to fetch positions:', err);
+    } finally {
+      setPositionsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const fetchBalance = async () => {
+      if (!userAddress) return;
+      setBalanceLoading(true);
+      try {
+        const res = await fetch(`http://localhost:8080/balance/${userAddress}`);
+        const json = await res.json();
+        if (json.success) setUserBalance(json.balance);
+      } catch (err) {
+        console.error('❌ Failed to load balance:', err);
+      } finally {
+        setBalanceLoading(false);
+      }
+    };
+    fetchBalance();
+    fetchPositions();
+  }, [userAddress]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        await fetch('http://localhost:8080/setup/crypto', { method: 'POST' });
+        const res = await fetch('http://localhost:8080/crypto/public-key');
+        const json = await res.json();
+        const pubkeyBytes = base64urlToUint8Array(json.publicKey);
+        const pubkeyBuffer = pubkeyBytes.buffer.slice(pubkeyBytes.byteOffset, pubkeyBytes.byteOffset + pubkeyBytes.byteLength);
+        const deserialized = await suite.kem.deserializePublicKey(pubkeyBuffer);
+        setBotPk(deserialized);
+      } catch (err) {
+        console.error('❌ Error loading bot key:', err);
+      }
+    })();
+  }, []);
 
   const tslaPriceData = useReadContract({
     address: '0x671db3340e1f84257c263DBBd46bFE4D5ffA777E',
@@ -64,67 +116,28 @@ export default function PrivateTradePage() {
     const levFactor = Math.round(lev);
     return {
       positionSize: posSize,
-      collateralRequired: levFactor > 0 ? (posSize) / levFactor : 0,
+      collateralRequired: levFactor > 0 ? posSize / levFactor : 0,
       estimatedFee: posSize * 0.001,
       liquidationPrice: lev > 0 ? entryPrice * (1 - 0.9 / lev) : 0,
     };
   }, [quantity, leverage, entryPrice]);
 
-  useEffect(() => {
-    const fetchBalance = async () => {
-      if (!userAddress) return;
-      setBalanceLoading(true);
-      try {
-        const res = await fetch(`http://localhost:8080/balance/${userAddress}`);
-        const json = await res.json();
-        if (json.success) setUserBalance(json.balance);
-      } catch (err) {
-        console.error('❌ Failed to load balance:', err);
-      } finally {
-        setBalanceLoading(false);
-      }
-    };
-    fetchBalance();
-  }, [userAddress]);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        await fetch('http://localhost:8080/setup/crypto', { method: 'POST' });
-        const res = await fetch('http://localhost:8080/crypto/public-key');
-        const json = await res.json();
-        const pubkeyBytes = base64urlToUint8Array(json.publicKey);
-        const pubkeyBuffer = pubkeyBytes.buffer.slice(pubkeyBytes.byteOffset, pubkeyBytes.byteOffset + pubkeyBytes.byteLength);
-        const deserialized = await suite.kem.deserializePublicKey(pubkeyBuffer);
-        setBotPk(deserialized);
-      } catch (err) {
-        console.error('❌ Error loading bot key:', err);
-      }
-    })();
-  }, []);
-  const [txHash, setTxHash] = useState<`0x${string}` | undefined>(undefined);
   const { writeContractAsync } = useWriteContract();
-  const { data: receipt, isLoading: txPending, isSuccess } = useWaitForTransactionReceipt({
-    hash: txHash,
-    confirmations: 1,
-  });
+  const [txHash, setTxHash] = useState<`0x${string}` | undefined>(undefined);
+  const { isSuccess } = useWaitForTransactionReceipt({ hash: txHash, confirmations: 1 });
 
   const handleDeposit = async () => {
     if (!userAddress || !depositAmount || isNaN(Number(depositAmount)) || Number(depositAmount) <= 0) {
       return alert('Enter valid deposit amount');
     }
-  
     try {
       const amountInUSDC = BigInt(Math.floor(Number(depositAmount) * 1e6));
-  
-      // Trigger USDC transfer
       const hash = await writeContractAsync({
         address: UsdcAdd,
         abi: usdcAbi,
         functionName: 'transfer',
         args: [ExAdd, amountInUSDC],
       });
-  
       setTxHash(hash);
       alert('Transaction sent! Waiting for confirmation...');
     } catch (err) {
@@ -132,7 +145,7 @@ export default function PrivateTradePage() {
       alert('Transfer failed.');
     }
   };
-  
+
   useEffect(() => {
     if (isSuccess && userAddress) {
       (async () => {
@@ -154,52 +167,65 @@ export default function PrivateTradePage() {
       })();
     }
   }, [isSuccess]);
-  
 
   const sendTrade = async () => {
     if (!botPk) return alert('Bot key not ready');
-  
     try {
-      const trader = Wallet.createRandom().address;
-      const isLong = direction === 'long';
       const assetId = asset === 'TSLA' ? 0 : 1;
-      console.log(userAddress);
       const sampleRes = await fetch('http://localhost:8080/trade/create-sample', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userAddress,
+          trader: userAddress,
           assetId,
           qty: (positionSize * 1e6).toFixed(0),
           margin: Math.floor(collateralRequired * 1e6).toString(),
-          isLong,
+          isLong: direction === 'long',
         }),
       });
-  
-      if (!sampleRes.ok) throw new Error('❌ create-sample failed');
       const sampleJson = await sampleRes.json();
-      console.log('✅ Encrypted sample response:', sampleJson);
-  
       const { enc, ct } = sampleJson.encrypted;
-  
-      const submitRes = await fetch('http://localhost:8080/trade/submit', {
+      await fetch('http://localhost:8080/trade/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enc, ct }),
       });
-  
-      if (!submitRes.ok) throw new Error('❌ trade/submit failed');
-      console.log('✅ Trade submitted');
-  
       alert('Trade submitted privately!');
       setQuantity('');
       setLeverage('1');
+      fetchPositions();
     } catch (err) {
       console.error('❌ sendTrade error:', err);
       alert('Trade failed: ' + err.message);
     }
   };
-  
+
+  const handleClosePosition = async () => {
+    try {
+      const assetId = asset === 'TSLA' ? 0 : 1;
+      const createRes = await fetch('http://localhost:8080/trade/create-close', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          trader: userAddress,
+          assetId,
+          closePercent: 100,
+        }),
+      });
+      const createJson = await createRes.json();
+      const { enc, ct } = createJson.encrypted;
+      await fetch('http://localhost:8080/trade/close', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enc, ct }),
+      });
+      alert('Position closed successfully!');
+      fetchPositions();
+    } catch (err) {
+      console.error('❌ handleClosePosition error:', err);
+      alert('Close failed: ' + err.message);
+    }
+  };
 
   return (
     <div className="px-4 xl:px-16 py-8">
@@ -209,32 +235,14 @@ export default function PrivateTradePage() {
             🕶️ Incognito Mode
             <span className="text-sm font-normal text-slate-400">Private Trading Enabled</span>
           </h2>
-          <p className="text-sm text-slate-400 mt-1">
-            Your trade details and wallet address will remain hidden on-chain.
-          </p>
+          <p className="text-sm text-slate-400 mt-1">Your trade details and wallet address will remain hidden on-chain.</p>
         </div>
         <div className="flex items-center gap-3">
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            value={depositAmount}
-            onChange={(e) => setDepositAmount(e.target.value)}
-            placeholder="Deposit USDC"
-            className="w-32 px-3 py-2 border border-white/10 rounded-lg text-white text-sm bg-slate-800"
-          />
-          <button
-            onClick={handleDeposit}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
-          >
-            Deposit
-          </button>
+          <input type="number" min="0" step="0.01" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)}
+            placeholder="Deposit USDC" className="w-32 px-3 py-2 border border-white/10 rounded-lg text-white text-sm bg-slate-800" />
+          <button onClick={handleDeposit} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">Deposit</button>
           <div className="text-white text-sm">
-            {balanceLoading
-              ? 'Loading...'
-              : userBalance
-              ? `Available: ${(Number(userBalance.available) / 1e6).toFixed(2)} USDC`
-              : 'Failed to load balance'}
+            {balanceLoading ? 'Loading...' : userBalance ? `Available: ${(Number(userBalance.available) / 1e6).toFixed(2)} USDC` : 'Failed to load balance'}
           </div>
         </div>
       </div>
@@ -319,7 +327,51 @@ export default function PrivateTradePage() {
           >
             {loading ? 'Processing...' : 'Send Private Trade'}
           </button>
+          <button
+           onClick={handleClosePosition}
+           disabled={loading}
+           className="w-full py-3 rounded-lg font-medium text-sm bg-yellow-600 text-white hover:bg-yellow-700 mt-2"
+           >
+           Close Position
+           </button>
         </div>
+          {/* Include your sendTrade & handleClosePosition buttons */}
+        </div>
+
+      <div className="bg-[#1f1f23]/80 border border-white/10 rounded-2xl p-4 mt-6 shadow-md">
+        <h3 className="text-white text-lg font-semibold mb-3">Your Positions</h3>
+        {positionsLoading ? (
+          <p className="text-slate-400 text-sm">Loading positions...</p>
+        ) : positions.length === 0 ? (
+          <p className="text-slate-400 text-sm">No active positions</p>
+        ) : (
+          positions.map((pos, idx) => (
+            <div key={idx} className="p-3 mb-3 bg-[#232329]/60 rounded-lg">
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-400">Asset</span>
+                <span className="text-white">{pos.assetId === 0 ? 'TSLA' : 'AAPL'}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-400">Side</span>
+                <span className={`${pos.isLong ? 'text-green-400' : 'text-red-400'}`}>
+                  {pos.isLong ? 'Long' : 'Short'}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-400">Size</span>
+                <span className="text-white">{(Number(pos.size) / 1e6).toFixed(2)} USD</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-400">Margin</span>
+                <span className="text-yellow-400">{(Number(pos.margin) / 1e6).toFixed(2)} USDC</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-400">Entry Price</span>
+                <span className="text-white">${(Number(pos.entryPrice) / 1e18).toFixed(2)}</span>
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
