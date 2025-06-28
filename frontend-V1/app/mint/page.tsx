@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -14,9 +13,10 @@ import {
 } from 'wagmi';
 import VaultABI from '../../utils/vault.json';
 import vaultSenderAbi from '@/abis/VaultContractSender.json'
-
+import { useChainId } from 'wagmi';
+import { sepolia, avalancheFuji } from 'wagmi/chains';
 // Constants
-const VAULT_ADDRESS = "0x57ebC3E9B1260Ac811a33c0C54fD3611eC627144";
+const VAULT_ADDRESS = "0x561B0fcC18D09dBa76c68Fa0910AcFf58A1EF6E2";
 const ASSET_TYPES = {
   sTSLA: 0, 
   sAAPL: 1,
@@ -34,7 +34,12 @@ const CCIP_CONFIG = {
   }
 };
 
+const CHAINS = [ sepolia, avalancheFuji];
+
 export default function MintPage() {
+  const chainId= useChainId()
+  const chain = CHAINS.find(c => c.id === chainId)
+  console.log(chain?.name, "chain name")
   // State management
   const [shares, setShares] = useState('');
   const [assetType, setAssetType] = useState<AssetLabel>('sTSLA');
@@ -48,17 +53,6 @@ export default function MintPage() {
   const { data: connectorClient } = useConnectorClient();
   const { data: walletClient } = useWalletClient();
 
-  // Simulation hook - only for Fuji
-  const simulation = useSimulateContract({
-    address: VAULT_ADDRESS,
-    abi: VaultABI.abi,
-    functionName: 'openPosition',
-    args: [ASSET_TYPES[assetType], BigInt(Math.floor(Number(shares) * 1e18))],
-    query: { 
-      enabled: isConnected && selectedChain === 'fuji' && !!shares && Number(shares) > 0
-    }
-  });
-
   // Transaction hooks
   const { 
     writeContract, 
@@ -70,14 +64,6 @@ export default function MintPage() {
   const txReceipt = useWaitForTransactionReceipt({ hash });
 
   // Error handling effects
-  useEffect(() => {
-    if (simulation.error) {
-      setSimulationError(extractErrorMessage(simulation.error));
-    } else {
-      setSimulationError('');
-    }
-  }, [simulation.error]);
-
   useEffect(() => {
     const error = writeError || txReceipt.error;
     if (error) {
@@ -95,7 +81,7 @@ export default function MintPage() {
     setCcipData({});
 
     try {
-      if (selectedChain === 'sepolia') {
+      if (chain?.name === 'Sepolia') {
         await executeCcipTransaction();
       } else {
         executeLocalTransaction();
@@ -131,11 +117,13 @@ export default function MintPage() {
   };
 
   const executeLocalTransaction = () => {
-    if (simulation.data?.request) {
-      writeContract(simulation.data.request);
-    } else {
-      alert('Please wait for simulation to complete');
-    }
+    // Directly call writeContract for Fuji chain
+    writeContract({
+      address: VAULT_ADDRESS,
+      abi: VaultABI.abi,
+      functionName: 'openPosition',
+      args: [ASSET_TYPES[assetType], BigInt(Math.floor(Number(shares) * 1e18))],
+    });
   };
 
   const executeCcipTransaction = useCallback(async () => {
@@ -182,7 +170,6 @@ export default function MintPage() {
 
   // Status messages
   const getStatusMessage = () => {
-    if (simulation.isFetching) return 'Simulating transaction...';
     if (isWritePending) return 'Confirming in wallet...';
     if (txReceipt.isLoading) return 'Processing transaction...';
     if (txReceipt.isSuccess) return 'Position opened successfully!';
@@ -191,10 +178,10 @@ export default function MintPage() {
   };
 
   const getExplorerLink = () => {
-    if (selectedChain === 'fuji' && txReceipt.isSuccess && hash) {
+    if (chain?.name === 'Avalanche Fuji' && txReceipt.isSuccess && hash) {
       return `https://testnet.snowtrace.io/tx/${hash}`;
     }
-    if (selectedChain === 'sepolia' && ccipData.hash) {
+    if (chain?.name === 'Sepolia' && ccipData.hash) {
       return `https://ccip.chain.link/#/side-drawer/msg/${ccipData.hash}`;
     }
     return null;
@@ -202,12 +189,12 @@ export default function MintPage() {
 
   const explorerLink = getExplorerLink();
   const statusMessage = getStatusMessage();
-  const isProcessing = simulation.isFetching || isWritePending || txReceipt.isLoading;
+  const isProcessing = /*simulation.isFetching ||*/ isWritePending || txReceipt.isLoading;
   const isDisabled = !isConnected || isProcessing || !shares || !!simulationError;
 
   return (
     <>
-      <div className="flex flex-col gap-4">
+      {/* <div className="flex flex-col gap-4">
         <label className="text-white/80 font-medium">Target Chain</label>
         <select
           className="bg-[#232329] border border-white/10 rounded-xl px-4 py-3 text-lg text-white focus:outline-none disabled:opacity-50"
@@ -218,7 +205,7 @@ export default function MintPage() {
           <option value="fuji">Avalanche Fuji</option>
           <option value="sepolia">Ethereum Sepolia</option>
         </select>
-      </div>
+      </div> */}
 
       <div className="min-h-screen flex items-center justify-center bg-[#111112] relative overflow-hidden">
         {/* Background balls - unchanged */}
@@ -266,11 +253,11 @@ export default function MintPage() {
           </div>
           
           {/* Simulation status */}
-          {isConnected && simulation.isFetching && (
+          {/*isConnected && simulation.isFetching && (
             <div className="text-yellow-400 text-sm text-center">
               Verifying transaction parameters...
             </div>
-          )}
+          )*/}
           
           {/* Action button */}
           <button
@@ -317,7 +304,7 @@ export default function MintPage() {
                 rel="noopener noreferrer"
                 className="text-blue-400 hover:underline text-center"
               >
-                {selectedChain === 'fuji' ? 'View on Snowtrace' : 'View on Etherscan'}
+                {chain?.name === 'Avalanche Fuji' ? 'View on Snowtrace' : 'View on Etherscan'}
               </a>
             )}
           </div>

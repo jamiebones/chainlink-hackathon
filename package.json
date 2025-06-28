@@ -29,5 +29,8 @@
   ],
   "author": "",
   "license": "MIT",
-  "description": "Chainlink Hackathon Monorepo with contracts, subgraph, and frontend"
+  "description": "Chainlink Hackathon Monorepo with contracts, subgraph, and frontend",
+  "dependencies": {
+    "react-hot-toast": "^2.5.2"
+  }
 }

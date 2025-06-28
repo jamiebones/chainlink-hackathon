@@ -7,10 +7,11 @@ import {
   getDefaultConfig,
 } from '@rainbow-me/rainbowkit';
 import { WagmiProvider } from 'wagmi';
-import {arbitrum, arbitrumSepolia, avalanche, avalancheFuji, sepolia} from 'wagmi/chains';
+import { arbitrum, arbitrumSepolia, avalanche, avalancheFuji, sepolia} from 'wagmi/chains';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { ReactNode } from 'react';
+import { Toaster } from 'react-hot-toast';
 
 // ✅ Define custom Fuji (Avalanche C-Chain Testnet)
 export const fuji: Chain = {
@@ -38,23 +39,37 @@ export const fuji: Chain = {
 };
 
 export default function Providers({ children }: { children: ReactNode }) {
-  //const [config, setConfig] = useState<ReturnType<typeof getDefaultConfig> | null>(null);
   const [queryClient] = useState(() => new QueryClient());
 
- 
-    const config = getDefaultConfig({
-      appName: 'sTSLA Hackathon App',
-      projectId: 'e872ba5075a2eb7e208dcaeb0bd70e37',
-      chains: [avalanche, avalancheFuji,sepolia, arbitrum, arbitrumSepolia],
-      ssr: false,
-    });
-   
- 
+  const config = getDefaultConfig({
+    appName: 'sTSLA Hackathon App',
+    projectId: 'e872ba5075a2eb7e208dcaeb0bd70e37',
+    chains: [avalanche, avalancheFuji, sepolia, arbitrum, arbitrumSepolia],
+    ssr: false,
+  });
 
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider>
+          <Toaster position="top-right" toastOptions={{
+            style: {
+              background: '#333',
+              color: '#fff',
+            },
+            success: {
+              iconTheme: {
+                primary: '#68d391',
+                secondary: '#333',
+              },
+            },
+            error: {
+              iconTheme: {
+                primary: '#f56565',
+                secondary: '#333',
+              },
+            },
+          }} />
           <header className="w-full sticky top-0 z-50 bg-[#111112] border-b border-white/10 shadow-sm">
             <div className="max-w-7xl mx-auto flex justify-between items-center px-6 py-4">
               <div className="flex items-center gap-10">
