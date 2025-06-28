@@ -7,7 +7,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 interface IPerpEngine {
     function applyNetDelta(uint8 assetId, int256 qtyDelta, int256 marginDelta) external;
-    function liquidateFromZK(address user, uint8 assetId) external;
+    function liquidateFromZK(address user, uint8 assetId, int256 size, uint256 margin) external;
 }
 
 interface IVerifier {
@@ -115,23 +115,22 @@ contract PerpEngineZk is ReentrancyGuard {
     bytes32 oldRoot,
     bytes32 newRoot,
     address trader,
-    int256 size,
-    uint256 margin,
-    uint256 entryFunding,
+    int256 sizeToClose,
+    uint256 marginToTransfer,
     uint[2] calldata a,
     uint[2][2] calldata b,
     uint[2] calldata c,
     uint[1] calldata publicInputs
-) external nonReentrant {
-    Asset storage a_ = asset[assetId];
-    require(a_.root == oldRoot, "stale root");
-    require(verifier.verifyProof(a, b, c, publicInputs), "invalid proof");
-    a_.root = newRoot;
-    a_.lastUpdate = uint40(block.timestamp);
-    perpEngine.liquidateFromZK(trader, assetId);
-    emit RootUpdated(assetId, oldRoot, newRoot);
-    emit LiquidationVerified(trader, assetId, size);
-}
+    ) external nonReentrant {
+        Asset storage a_ = asset[assetId];
+        require(a_.root == oldRoot, "stale root");
+        require(verifier.verifyProof(a, b, c, publicInputs), "invalid proof");
+        a_.root = newRoot;
+        a_.lastUpdate = uint40(block.timestamp);
+        perpEngine.liquidateFromZK(trader, assetId, sizeToClose, marginToTransfer);
+        emit RootUpdated(assetId, oldRoot, newRoot);
+        emit LiquidationVerified(trader, assetId, sizeToClose);
+    }
 
 
     function getCurrentRoot(uint8 assetId) external view returns (bytes32) {
