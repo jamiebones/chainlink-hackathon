@@ -177,7 +177,7 @@ contract Vault is ReentrancyGuard {
         Utils.Asset assetType,
         uint256 numofShares //comes in as 18 decimals from the frontend
     ) external nonReentrant {
-        
+       
       (IAsset assetContract, uint256 totalToCollectUSDC, 
       uint256 mintFeeUSDC, 
       uint256 newIndex, 
@@ -307,7 +307,7 @@ contract Vault is ReentrancyGuard {
         });
     }
 
-    function redeemVault(uint256 vaultID, uint256 portionToRedeem) external {
+    function redeemVault(uint256 vaultID, uint256 portionToRedeem) external nonReentrant {
         //check if the vault is present and has not been redeemed already
         if (!isStarted) revert NotStarted();
         if (vaultID >= userPositionCount[msg.sender]) {
@@ -580,7 +580,7 @@ contract Vault is ReentrancyGuard {
         uint256 mintFeeUSDC,
         uint256 usdcPaid,
         uint256 assetPrice
-    ) external onlyReceiverContract nonReentrant {
+    ) external nonReentrant {
         
         _checkPriceAndMarketStatus(assetType);
 
@@ -661,7 +661,7 @@ contract Vault is ReentrancyGuard {
         address trader, // Explicit trader address (replaces msg.sender)
         Utils.Asset assetType,
         uint256 numofShares
-    ) internal nonReentrant returns (IAsset, uint256 , uint256, uint256, uint256, uint256, uint256) {
+    ) internal returns (IAsset, uint256 , uint256, uint256, uint256, uint256, uint256) {
         if (numofShares == 0) revert InvalidNumberOfShares();
         //numofShares comes from the frontend as 18 decimals
         _checkPriceAndMarketStatus(assetType);
