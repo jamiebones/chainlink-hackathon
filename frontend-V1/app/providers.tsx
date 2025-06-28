@@ -75,8 +75,10 @@ export default function Providers({ children }: { children: ReactNode }) {
               <div className="flex items-center gap-10">
                 <h1 className="text-2xl font-bold text-white tracking-tight">sTSLA Dashboard</h1>
                 <nav className="flex gap-6">
-                  <a href="#" className="text-white/80 hover:text-white px-3 py-2 rounded transition-colors font-medium">Trade</a>
-                  <a href="#" className="text-white/80 hover:text-white px-3 py-2 rounded transition-colors font-medium">Portfolio</a>
+                    <a href="/mint" className="text-white/80 hover:text-white px-3 py-2 rounded transition-colors font-medium">Mint</a>
+                    <a href="/trade" className="text-white/80 hover:text-white px-3 py-2 rounded transition-colors font-medium">Trade</a>
+                    <a href="/liquidity" className="text-white/80 hover:text-white px-3 py-2 rounded transition-colors font-medium">Liquidity Pool</a>
+                    <a href="/redeem" className="text-white/80 hover:text-white px-3 py-2 rounded transition-colors font-medium">Redeem Stock</a>
                 </nav>
               </div>
               <ConnectButton />

@@ -56,7 +56,7 @@ export default function PositionTable() {
 
   if (MOCK_POSITIONS.length === 0) {
     return (
-      <div className=" border border-gray-700 rounded-xl p-6">
+     <div className="bg-white/10 border border-white/10 rounded-2xl p-8 shadow-lg backdrop-blur-md">
         <h2 className="text-xl font-semibold text-yellow-400 mb-4">Open Positions</h2>
         <div className="text-center py-12">
           <div className="text-gray-500 text-lg mb-2">No open positions</div>
@@ -67,7 +67,7 @@ export default function PositionTable() {
   }
 
   return (
-    <div className=" border border-gray-700 rounded-xl p-6">
+     <div className="bg-white/10 border border-white/10 rounded-2xl p-8 shadow-lg backdrop-blur-md">
       <h2 className="text-xl font-semibold text-yellow-400 mb-6">Open Positions</h2>
 
       <div className="overflow-x-auto">

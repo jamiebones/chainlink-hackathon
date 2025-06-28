@@ -75,16 +75,21 @@ const positionData = useReadContract({
   address: PerpAdd,
   abi: PerpEngineABI,
   functionName: 'getPosition',
-  args: [userAddress, ASSET_ENUM[symbol]],
+  args: userAddress ? [userAddress, ASSET_ENUM[symbol]] : undefined,
   query: {
     refetchInterval: 3000,
-    enabled: isConnected,
+    enabled: isConnected && !!userAddress,
   },
 })
 
-const hasPosition = positionData.data && positionData.data[0] > 0n
-console.log("outside");
-console.log(hasPosition);
+const isPositionLoading = positionData.isLoading || !userAddress;
+const hasPosition = positionData.data && Array.isArray(positionData.data) && positionData.data[0] > 0n;
+
+if (isPositionLoading) {
+  return (
+    <div className="text-white text-center py-10">Loading position data...</div>
+  );
+}
 
 const handleTrade = async () => {
   if (!isConnected) {
@@ -221,11 +226,11 @@ const handleTrade = async () => {
   }
 
   return (
-    <div className="bg-[#18181b]/90 border border-white/10 rounded-2xl overflow-hidden shadow-2xl backdrop-blur-md">
-      <div className="p-4 border-b border-white/10 bg-[#18181b]/80">
-        <h2 className="text-lg font-semibold text-white">Trade</h2>
+     <div className="bg-white/10 border border-white/10 rounded-2xl overflow-hidden shadow-2xl backdrop-blur-md">
+      <div className="p-4 border-b border-white/10 bg-[#18181b]/70 rounded-t-2xl">
+        <h2 className="text-lg font-semibold text-white tracking-tight">Trade</h2>
       </div>
-      <div className="p-4 space-y-6">
+      <div className="p-5 space-y-7">
         {/* Direction Toggle */}
         <div className="flex bg-[#232329]/80 rounded-lg p-1 mb-4">
           {['long', 'short'].map((d) => (

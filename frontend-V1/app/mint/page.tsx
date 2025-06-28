@@ -2,28 +2,23 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
-import { 
-  useAccount, 
+import {
+  useAccount,
   useWriteContract,
-  useWalletClient, 
-  useWaitForTransactionReceipt, 
-  useSimulateContract,
-  BaseError,
-  useConnectorClient
+  useWalletClient,
+  useWaitForTransactionReceipt,
+  useConnectorClient,
+  useChainId
 } from 'wagmi';
 import VaultABI from '../../utils/vault.json';
-import vaultSenderAbi from '@/abis/VaultContractSender.json'
-import { useChainId } from 'wagmi';
+import vaultSenderAbi from '@/abis/VaultContractSender.json';
 import { sepolia, avalancheFuji } from 'wagmi/chains';
-// Constants
+
+// Constants (update as needed)
 const VAULT_ADDRESS = "0x561B0fcC18D09dBa76c68Fa0910AcFf58A1EF6E2";
-const ASSET_TYPES = {
-  sTSLA: 0, 
-  sAAPL: 1,
-} as const;
+const ASSET_TYPES = { sTSLA: 0, sAAPL: 1 } as const;
 type AssetLabel = keyof typeof ASSET_TYPES;
 
-// CCIP Configuration
 const CCIP_CONFIG = {
   sepolia: {
     receiver: "0x60D5A7f7f49D307e36AadAd994EF2e164a42BA54",
@@ -34,19 +29,16 @@ const CCIP_CONFIG = {
   }
 };
 
-const CHAINS = [ sepolia, avalancheFuji];
+const CHAINS = [sepolia, avalancheFuji];
 
 export default function MintPage() {
-  const chainId= useChainId()
-  const chain = CHAINS.find(c => c.id === chainId)
-  console.log(chain?.name, "chain name")
-  // State management
+  const chainId = useChainId();
+  const chain = CHAINS.find(c => c.id === chainId);
   const [shares, setShares] = useState('');
   const [assetType, setAssetType] = useState<AssetLabel>('sTSLA');
   const [simulationError, setSimulationError] = useState('');
   const [transactionError, setTransactionError] = useState('');
-  const [selectedChain, setSelectedChain] = useState<'fuji' | 'sepolia'>('fuji');
-  const [ccipData, setCcipData] = useState<{hash?: string, error?: string}>({});
+  const [ccipData, setCcipData] = useState<{ hash?: string, error?: string }>({});
 
   // Wallet hooks
   const { address, isConnected } = useAccount();
@@ -54,13 +46,12 @@ export default function MintPage() {
   const { data: walletClient } = useWalletClient();
 
   // Transaction hooks
-  const { 
-    writeContract, 
-    error: writeError, 
-    isPending: isWritePending, 
-    data: hash 
+  const {
+    writeContract,
+    error: writeError,
+    isPending: isWritePending,
+    data: hash
   } = useWriteContract();
-
   const txReceipt = useWaitForTransactionReceipt({ hash });
 
   // Error handling effects
@@ -76,10 +67,8 @@ export default function MintPage() {
   // Transaction execution
   const handleOpenPosition = async () => {
     if (!validateInputs()) return;
-    
     setTransactionError('');
     setCcipData({});
-
     try {
       if (chain?.name === 'Sepolia') {
         await executeCcipTransaction();
@@ -87,13 +76,12 @@ export default function MintPage() {
         executeLocalTransaction();
       }
     } catch (error: any) {
-      console.error("Transaction Error:", error);
       setTransactionError(error.message || 'Transaction failed');
     }
   };
 
   // Helper functions
-  const validateInputs = () => {
+  function validateInputs() {
     if (!isConnected || !connectorClient) {
       alert('Connect your wallet first');
       return false;
@@ -103,34 +91,27 @@ export default function MintPage() {
       return false;
     }
     return true;
-  };
+  }
 
-  const extractErrorMessage = (error: unknown): string => {
+  function extractErrorMessage(error: unknown): string {
     if (!error) return '';
-    if (error instanceof BaseError) {
-      const revertError = error.walk(err => 
-        err instanceof BaseError && err.name === 'ContractFunctionExecutionError'
-      );
-      return revertError?.shortMessage || error.shortMessage || error.message;
-    }
-    return error instanceof Error ? error.message : String(error);
-  };
+    // @ts-ignore
+    return error.shortMessage || error.message || String(error);
+  }
 
-  const executeLocalTransaction = () => {
-    // Directly call writeContract for Fuji chain
+  function executeLocalTransaction() {
     writeContract({
       address: VAULT_ADDRESS,
       abi: VaultABI.abi,
       functionName: 'openPosition',
-      args: [ASSET_TYPES[assetType], BigInt(Math.floor(Number(shares) * 1e18))],
+      args: [ASSET_TYPES[assetType], BigInt(Math.floor(Number(shares) * 1e18))]
     });
-  };
+  }
 
   const executeCcipTransaction = useCallback(async () => {
     try {
       const { usdcAddress, senderContract, receiver, chainSelector } = CCIP_CONFIG.sepolia;
       const usdcAmount = BigInt(Math.floor(Number(shares) * 10 ** 6));
-      
       if (!walletClient) throw new Error('Wallet client unavailable');
 
       const provider = new ethers.BrowserProvider(walletClient.transport);
@@ -140,13 +121,11 @@ export default function MintPage() {
       const usdc = new ethers.Contract(usdcAddress, [
         "function approve(address, uint256) returns (bool)"
       ], signer);
-      
       const approveTx = await usdc.approve(senderContract, usdcAmount);
       await approveTx.wait();
 
       // CCIP Position Opening
       const vaultSender = new ethers.Contract(senderContract, vaultSenderAbi, signer);
-      
       const positionRequest = {
         asset: ASSET_TYPES[assetType],
         amount: usdcAmount,
@@ -154,21 +133,17 @@ export default function MintPage() {
         fujiChainSelector: chainSelector,
         fujiReceiver: receiver
       };
-
       const ccipTx = await vaultSender.openPositionViaCCIP(positionRequest);
       const receipt = await ccipTx.wait();
-      
       setCcipData({ hash: receipt.hash });
-      console.log("CCIP hash:", receipt.hash);
       alert("Position submitted via CCIP successfully!");
     } catch (error: any) {
-      console.error("CCIP Error:", error);
       setCcipData({ error: error.message || 'CCIP transaction failed' });
       throw error;
     }
   }, [shares, assetType, address, walletClient]);
 
-  // Status messages
+  // Status messages & explorer link
   const getStatusMessage = () => {
     if (isWritePending) return 'Confirming in wallet...';
     if (txReceipt.isLoading) return 'Processing transaction...';
@@ -176,7 +151,6 @@ export default function MintPage() {
     if (ccipData.hash) return 'CCIP transaction completed!';
     return '';
   };
-
   const getExplorerLink = () => {
     if (chain?.name === 'Avalanche Fuji' && txReceipt.isSuccess && hash) {
       return `https://testnet.snowtrace.io/tx/${hash}`;
@@ -189,29 +163,30 @@ export default function MintPage() {
 
   const explorerLink = getExplorerLink();
   const statusMessage = getStatusMessage();
-  const isProcessing = /*simulation.isFetching ||*/ isWritePending || txReceipt.isLoading;
+  const isProcessing = isWritePending || txReceipt.isLoading;
   const isDisabled = !isConnected || isProcessing || !shares || !!simulationError;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#111112] relative overflow-hidden font-sans">
-      {/* Background balls - unchanged */}
+    <div className="min-h-screen flex items-center justify-center relative bg-[#111014] font-[Inter,sans-serif] overflow-hidden">
+      {/* Soft Uniswap background */}
       <div className="absolute inset-0 pointer-events-none z-0">
-        <div className="absolute top-1/4 left-1/4 w-48 h-48 bg-pink-500 opacity-30 blur-3xl rounded-full" />
-        <div className="absolute top-2/3 left-2/3 w-40 h-40 bg-yellow-400 opacity-20 blur-3xl rounded-full" />
-        <div className="absolute top-1/2 left-1/2 w-32 h-32 bg-blue-400 opacity-20 blur-3xl rounded-full" />
-        <div className="absolute top-1/3 left-2/3 w-36 h-36 bg-green-400 opacity-20 blur-3xl rounded-full" />
+        <div className="absolute -top-24 -left-32 w-[540px] h-[400px] bg-gradient-to-tr from-pink-400/20 via-blue-400/10 to-transparent rounded-full blur-3xl" />
+        <div className="absolute top-2/3 right-1/4 w-[380px] h-[320px] bg-gradient-to-br from-purple-400/20 via-indigo-400/10 to-transparent rounded-full blur-2xl" />
+        <div className="absolute top-1/4 left-2/3 w-[280px] h-[200px] bg-gradient-to-tl from-fuchsia-400/15 via-white/0 to-transparent rounded-full blur-2xl" />
       </div>
-      <div className="relative z-10 w-full max-w-md mx-auto glassy-card p-8 flex flex-col gap-6">
-        <h2 className="text-2xl font-bold text-white mb-2 text-center">Open Position</h2>
+      <div className="relative z-10 w-full max-w-md mx-auto glassy-card p-8 flex flex-col gap-7 rounded-2xl shadow-2xl bg-white/10 backdrop-blur-xl border border-white/10">
+        <h2 className="text-2xl font-extrabold text-white mb-2 text-center tracking-tight" style={{ fontFamily: 'Inter, Geist, sans-serif' }}>
+          Open Position
+        </h2>
         {!isConnected && (
-          <div className="text-center py-4 text-yellow-400">
+          <div className="text-center py-4 text-yellow-300 bg-yellow-500/10 rounded-lg font-medium">
             Connect your wallet to begin
           </div>
         )}
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-2">
           <label className="text-white/80 font-medium">Asset</label>
           <select
-            className="w-full"
+            className="w-full rounded-lg bg-black/20 border border-white/15 px-4 py-2 text-white/90 focus:ring-2 focus:ring-pink-400/40"
             value={assetType}
             onChange={e => setAssetType(e.target.value as AssetLabel)}
             disabled={!isConnected}
@@ -220,61 +195,56 @@ export default function MintPage() {
             <option value="sAAPL">sAAPL</option>
           </select>
         </div>
-        <div className="flex flex-col gap-4">
-          <label className="text-white/80 font-medium">{chain?.name === "Sepolia" ? "USDC amount to buy Shares": "Number of Shares"}</label>
+        <div className="flex flex-col gap-2">
+          <label className="text-white/80 font-medium">
+            {chain?.name === "Sepolia" ? "USDC Amount" : "Number of Shares"}
+          </label>
           <input
             type="number"
             min="0.01"
             step="any"
-            className="w-full"
+            className="w-full rounded-lg bg-black/20 border border-white/15 px-4 py-2 text-white/90 focus:ring-2 focus:ring-pink-400/40 placeholder:text-white/30"
             placeholder="Enter value"
             value={shares}
             onChange={e => setShares(e.target.value)}
             disabled={!isConnected}
           />
         </div>
-        {/* Action button */}
         <button
-          className="btn-primary mt-4 w-full"
+          className={`w-full mt-2 px-6 py-3 rounded-lg bg-gradient-to-r from-pink-400/80 to-blue-400/80 text-white text-lg font-bold shadow-md transition-all 
+            ${isDisabled ? "opacity-50 cursor-not-allowed" : "hover:scale-105 hover:shadow-xl"}
+          `}
           onClick={handleOpenPosition}
           disabled={isDisabled}
         >
-          {!isConnected ? 'Connect Wallet' : 
-           isProcessing ? 'Processing...' : 'Open Position'}
+          {!isConnected ? 'Connect Wallet' :
+            isProcessing ? 'Processing...' : 'Open Position'}
         </button>
         {/* Status and error messages */}
-        <div className="min-h-[100px] flex flex-col gap-2">
+        <div className="min-h-[60px] flex flex-col gap-2">
           {simulationError && (
-            <div className="text-red-400 p-3 bg-red-900/20 rounded-lg">
+            <div className="text-red-400 p-3 bg-red-900/20 rounded-lg text-sm">
               <strong>Simulation Error:</strong> {simulationError}
-              <div className="text-sm mt-1">
-                {simulationError.includes('NotStarted') && 'Protocol not initialized - contact support'}
-                {simulationError.includes('FeeReceiverNotSet') && 'Fee receiver not configured - contact support'}
-                {simulationError.includes('InsufficientFundForPayout') && 'Insufficient USDC balance or allowance'}
-                {simulationError.includes('CircuitBreaker') && 'Price feed issue - try again later'}
-              </div>
             </div>
           )}
           {(transactionError || ccipData.error) && (
-            <div className="text-red-400 p-3 bg-red-900/20 rounded-lg">
+            <div className="text-red-400 p-3 bg-red-900/20 rounded-lg text-sm">
               <strong>Transaction Error:</strong> {transactionError || ccipData.error}
             </div>
           )}
           {statusMessage && (
-            <div className={`text-center p-3 rounded-lg ${
-              txReceipt.isSuccess || ccipData.hash ? 'bg-green-900/20 text-green-400' : 'text-blue-400'
-            }`}>
+            <div className={`text-center p-3 rounded-lg text-base font-semibold ${txReceipt.isSuccess || ccipData.hash ? 'bg-green-900/20 text-green-400' : 'text-blue-400'}`}>
               {statusMessage}
             </div>
           )}
           {explorerLink && (
-            <a 
+            <a
               href={explorerLink}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-blue-400 hover:underline text-center"
+              className="text-blue-400 hover:underline text-center text-sm"
             >
-              {chain?.name === 'Avalanche Fuji' ? 'View on Snowtrace' : 'View on Etherscan'}
+              {chain?.name === 'Avalanche Fuji' ? 'View on Snowtrace' : 'View on CCIP Explorer'}
             </a>
           )}
         </div>

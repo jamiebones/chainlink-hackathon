@@ -1,29 +1,19 @@
-'use client'
 import React from 'react'
 
-interface Props {
-  title: string
-  description: string
-  icon?: React.ReactNode
-  colorClass?: string // Tailwind color class for card bg/text
-  onClick?: () => void
-}
-
-export default function DashboardCard({ title, description, icon, colorClass = '', onClick }: Props) {
+export default function DashboardCard({ title, description, icon, onClick }) {
   return (
-    <div
+    <button
       onClick={onClick}
-      className={`glassy-card p-7 flex flex-col gap-4 border border-white/10 transition-all duration-200 cursor-pointer group shadow-lg hover:shadow-2xl hover:scale-[1.025] focus:outline-none focus:ring-2 focus:ring-pink-400/40 ${colorClass}`}
+      className="w-full h-full p-8 rounded-2xl bg-white/10 backdrop-blur-lg border border-white/10 shadow-xl hover:shadow-2xl hover:bg-white/15 transition-all duration-200 outline-none focus:ring-2 focus:ring-pink-400/40 flex flex-col gap-4 items-start"
       style={{
-        fontFamily: 'Inter, sans-serif',
-        minHeight: 220,
+        minHeight: 215,
       }}
     >
-      <div className="inline-flex items-center gap-2 bg-black/60 px-4 py-2 rounded-full w-fit mb-2">
+      <div className="flex items-center gap-3 mb-2">
         {icon}
-        <span className="font-semibold text-white group-hover:text-white/90 transition-all text-base">{title}</span>
+        <span className="font-semibold text-white text-lg">{title}</span>
       </div>
-      <div className="text-lg font-medium text-white/80 group-hover:text-white transition-all">{description}</div>
-    </div>
+      <div className="text-base font-medium text-white/80">{description}</div>
+    </button>
   )
 }

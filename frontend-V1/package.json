@@ -9,11 +9,13 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@fontsource/space-grotesk": "^5.2.8",
     "@hpke/chacha20poly1305": "^1.6.2",
     "@hpke/core": "^1.7.2",
     "@hpke/dhkem-x25519": "^1.6.2",
     "@rainbow-me/rainbowkit": "^2.2.6",
     "@tanstack/react-query": "^5.80.6",
+    "framer-motion": "^12.19.2",
     "next": "15.3.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
