@@ -13,11 +13,10 @@ export default function DashboardCard({ title, description, icon, colorClass = '
   return (
     <div
       onClick={onClick}
-      className={`rounded-3xl ${colorClass} p-7 flex flex-col gap-4 border border-transparent bg-clip-padding backdrop-blur-xl transition-all duration-200 cursor-pointer group shadow-lg hover:shadow-2xl hover:scale-[1.025] focus:outline-none focus:ring-2 focus:ring-white/20`}
+      className={`glassy-card p-7 flex flex-col gap-4 border border-white/10 transition-all duration-200 cursor-pointer group shadow-lg hover:shadow-2xl hover:scale-[1.025] focus:outline-none focus:ring-2 focus:ring-pink-400/40 ${colorClass}`}
       style={{
         fontFamily: 'Inter, sans-serif',
         minHeight: 220,
-        boxShadow: '0 2px 24px 0 rgba(0,0,0,0.12)',
       }}
     >
       <div className="inline-flex items-center gap-2 bg-black/60 px-4 py-2 rounded-full w-fit mb-2">

@@ -40,43 +40,48 @@ export default function LiquidityLanding() {
   }, [totalLiquidity, reservedLiquidity])
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-12 text-white">
-      <h1 className="text-3xl sm:text-4xl font-bold mb-3">🪙 Liquidity Pool</h1>
-      <p className="text-slate-400 mb-10 text-sm sm:text-base">
-        Manage your USDC liquidity. Choose an action below.
-      </p>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-10">
-        <div
-          onClick={() => router.push('/liquidity/deposit')}
-          className="cursor-pointer bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-2xl p-6 shadow-lg transition"
-        >
-          <h2 className="text-lg font-semibold mb-2">📥 Deposit</h2>
-          <p className="text-slate-400 text-sm">Add USDC to the pool and earn fees.</p>
-        </div>
-
-        <div
-          onClick={() => router.push('/liquidity/withdraw')}
-          className="cursor-pointer bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-2xl p-6 shadow-lg transition"
-        >
-          <h2 className="text-lg font-semibold mb-2">📤 Withdraw</h2>
-          <p className="text-slate-400 text-sm">Redeem your LP tokens for USDC.</p>
-        </div>
-
-        <div
-          onClick={() => router.push('/liquidity/claim')}
-          className="cursor-pointer bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-2xl p-6 shadow-lg transition"
-        >
-          <h2 className="text-lg font-semibold mb-2">💰 Claim Fees</h2>
-          <p className="text-slate-400 text-sm">Collect your share of trading fees.</p>
-        </div>
+    <div className="min-h-screen bg-[#111112] font-sans flex flex-col items-center justify-center relative overflow-hidden">
+      {/* Blurred colored balls for Uniswap-style background */}
+      <div className="absolute inset-0 pointer-events-none z-0">
+        <div className="absolute top-1/4 left-1/4 w-48 h-48 bg-pink-500 opacity-30 blur-3xl rounded-full" />
+        <div className="absolute top-2/3 left-2/3 w-40 h-40 bg-yellow-400 opacity-20 blur-3xl rounded-full" />
+        <div className="absolute top-1/2 left-1/2 w-32 h-32 bg-blue-400 opacity-20 blur-3xl rounded-full" />
+        <div className="absolute top-1/3 left-2/3 w-36 h-36 bg-green-400 opacity-20 blur-3xl rounded-full" />
       </div>
-
-      {/* Pool Stats Section */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-        <StatCard title="💧 Total Liquidity" value={`$${liquidity}`} />
-        <StatCard title="🔒 Reserved Liquidity" value={`$${reserved}`} />
-        <StatCard title="📊 Utilization" value={`${utilization}%`} />
+      <div className="relative z-10 w-full max-w-4xl mx-auto px-4 py-12">
+        <h1 className="text-3xl sm:text-4xl font-bold mb-3 text-white">🪙 Liquidity Pool</h1>
+        <p className="text-slate-400 mb-10 text-sm sm:text-base">
+          Manage your USDC liquidity. Choose an action below.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-10">
+          <div
+            onClick={() => router.push('/liquidity/deposit')}
+            className="glassy-card cursor-pointer hover:scale-105 transition"
+          >
+            <h2 className="text-lg font-semibold mb-2">📥 Deposit</h2>
+            <p className="text-slate-400 text-sm">Add USDC to the pool and earn fees.</p>
+          </div>
+          <div
+            onClick={() => router.push('/liquidity/withdraw')}
+            className="glassy-card cursor-pointer hover:scale-105 transition"
+          >
+            <h2 className="text-lg font-semibold mb-2">📤 Withdraw</h2>
+            <p className="text-slate-400 text-sm">Redeem your LP tokens for USDC.</p>
+          </div>
+          <div
+            onClick={() => router.push('/liquidity/claim')}
+            className="glassy-card cursor-pointer hover:scale-105 transition"
+          >
+            <h2 className="text-lg font-semibold mb-2">💰 Claim Fees</h2>
+            <p className="text-slate-400 text-sm">Collect your share of trading fees.</p>
+          </div>
+        </div>
+        {/* Pool Stats Section */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+          <StatCard title="💧 Total Liquidity" value={`$${liquidity}`} />
+          <StatCard title="🔒 Reserved Liquidity" value={`$${reserved}`} />
+          <StatCard title="📊 Utilization" value={`${utilization}%`} />
+        </div>
       </div>
     </div>
   )

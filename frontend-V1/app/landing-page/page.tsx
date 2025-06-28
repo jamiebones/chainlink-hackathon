@@ -6,7 +6,7 @@ import React from 'react'
 export default function LandingPage() {
   const router = useRouter()
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-[#111112] relative overflow-hidden font-[Inter,sans-serif]">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#111112] relative overflow-hidden font-sans">
       {/* Blurred colored balls for Uniswap-style background */}
       <div className="absolute inset-0 pointer-events-none z-0">
         <div className="absolute top-1/4 left-1/4 w-48 h-48 bg-pink-500 opacity-30 blur-3xl rounded-full" />
@@ -20,29 +20,25 @@ export default function LandingPage() {
           <DashboardCard
             title="Mint"
             description="Deposit USDC to mint sTSLA"
-            icon={<span className="text-orange-400 text-lg">&#x2753;</span>}
-            colorClass="bg-[rgba(255,98,0,0.08)] border-[rgba(255,98,0,0.18)] hover:bg-[rgba(255,98,0,0.16)] hover:border-[rgba(255,98,0,0.28)] shadow-[0_4px_32px_0_rgba(255,98,0,0.10)]"
+            icon={<span className="text-pink-400 text-lg">🪙</span>}
             onClick={() => router.push('/mint')}
           />
           <DashboardCard
             title="Trade"
             description="Open long/short positions on sTSLA"
-            icon={<span className="text-yellow-200 text-lg">📖</span>}
-            colorClass="bg-[rgba(255,255,140,0.07)] border-[rgba(255,255,140,0.15)] hover:bg-[rgba(255,255,140,0.13)] hover:border-[rgba(255,255,140,0.25)] shadow-[0_4px_32px_0_rgba(255,255,140,0.08)]"
+            icon={<span className="text-yellow-300 text-lg">📈</span>}
             onClick={() => router.push('/trade')}
           />
           <DashboardCard
             title="Provide Liquidity"
             description="Stake to Perp Engine to earn fees"
             icon={<span className="text-green-300 text-lg">💧</span>}
-            colorClass="bg-[rgba(0,255,140,0.07)] border-[rgba(0,255,140,0.15)] hover:bg-[rgba(0,255,140,0.13)] hover:border-[rgba(0,255,140,0.25)] shadow-[0_4px_32px_0_rgba(0,255,140,0.08)]"
             onClick={() => router.push('/liquidity')}
           />
           <DashboardCard
             title="Sweep Vault Slot"
             description="Withdraw buffer + PnL from closed positions"
-            icon={<span className="text-pink-400 text-lg">💬</span>}
-            colorClass="bg-[rgba(255,0,140,0.08)] border-[rgba(255,0,140,0.18)] hover:bg-[rgba(255,0,140,0.16)] hover:border-[rgba(255,0,140,0.28)] shadow-[0_4px_32px_0_rgba(255,0,140,0.10)]"
+            icon={<span className="text-blue-400 text-lg">💬</span>}
             onClick={() => router.push('/sweep')}
           />
         </div>

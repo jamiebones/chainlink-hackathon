@@ -193,124 +193,93 @@ export default function MintPage() {
   const isDisabled = !isConnected || isProcessing || !shares || !!simulationError;
 
   return (
-    <>
-      {/* <div className="flex flex-col gap-4">
-        <label className="text-white/80 font-medium">Target Chain</label>
-        <select
-          className="bg-[#232329] border border-white/10 rounded-xl px-4 py-3 text-lg text-white focus:outline-none disabled:opacity-50"
-          value={selectedChain}
-          onChange={e => setSelectedChain(e.target.value as 'fuji' | 'sepolia')}
-          disabled={!isConnected}
-        >
-          <option value="fuji">Avalanche Fuji</option>
-          <option value="sepolia">Ethereum Sepolia</option>
-        </select>
-      </div> */}
-
-      <div className="min-h-screen flex items-center justify-center bg-[#111112] relative overflow-hidden">
-        {/* Background balls - unchanged */}
-        <div className="absolute inset-0 pointer-events-none z-0">
-          <div className="absolute top-1/4 left-1/4 w-48 h-48 bg-pink-500 opacity-30 blur-3xl rounded-full" />
-          <div className="absolute top-2/3 left-2/3 w-40 h-40 bg-yellow-400 opacity-20 blur-3xl rounded-full" />
-          <div className="absolute top-1/2 left-1/2 w-32 h-32 bg-blue-400 opacity-20 blur-3xl rounded-full" />
-          <div className="absolute top-1/3 left-2/3 w-36 h-36 bg-green-400 opacity-20 blur-3xl rounded-full" />
+    <div className="min-h-screen flex items-center justify-center bg-[#111112] relative overflow-hidden font-sans">
+      {/* Background balls - unchanged */}
+      <div className="absolute inset-0 pointer-events-none z-0">
+        <div className="absolute top-1/4 left-1/4 w-48 h-48 bg-pink-500 opacity-30 blur-3xl rounded-full" />
+        <div className="absolute top-2/3 left-2/3 w-40 h-40 bg-yellow-400 opacity-20 blur-3xl rounded-full" />
+        <div className="absolute top-1/2 left-1/2 w-32 h-32 bg-blue-400 opacity-20 blur-3xl rounded-full" />
+        <div className="absolute top-1/3 left-2/3 w-36 h-36 bg-green-400 opacity-20 blur-3xl rounded-full" />
+      </div>
+      <div className="relative z-10 w-full max-w-md mx-auto glassy-card p-8 flex flex-col gap-6">
+        <h2 className="text-2xl font-bold text-white mb-2 text-center">Open Position</h2>
+        {!isConnected && (
+          <div className="text-center py-4 text-yellow-400">
+            Connect your wallet to begin
+          </div>
+        )}
+        <div className="flex flex-col gap-4">
+          <label className="text-white/80 font-medium">Asset</label>
+          <select
+            className="w-full"
+            value={assetType}
+            onChange={e => setAssetType(e.target.value as AssetLabel)}
+            disabled={!isConnected}
+          >
+            <option value="sTSLA">sTSLA</option>
+            <option value="sAAPL">sAAPL</option>
+          </select>
         </div>
-        
-        <div className="relative z-10 w-full max-w-md mx-auto rounded-3xl bg-[#18181b]/90 border border-white/10 shadow-2xl p-8 flex flex-col gap-6 backdrop-blur-md">
-          <h2 className="text-2xl font-bold text-white mb-2 text-center">Open Position</h2>
-          
-          {!isConnected && (
-            <div className="text-center py-4 text-yellow-400">
-              Connect your wallet to begin
+        <div className="flex flex-col gap-4">
+          <label className="text-white/80 font-medium">{chain?.name === "Sepolia" ? "USDC amount to buy Shares": "Number of Shares"}</label>
+          <input
+            type="number"
+            min="0.01"
+            step="any"
+            className="w-full"
+            placeholder="Enter value"
+            value={shares}
+            onChange={e => setShares(e.target.value)}
+            disabled={!isConnected}
+          />
+        </div>
+        {/* Action button */}
+        <button
+          className="btn-primary mt-4 w-full"
+          onClick={handleOpenPosition}
+          disabled={isDisabled}
+        >
+          {!isConnected ? 'Connect Wallet' : 
+           isProcessing ? 'Processing...' : 'Open Position'}
+        </button>
+        {/* Status and error messages */}
+        <div className="min-h-[100px] flex flex-col gap-2">
+          {simulationError && (
+            <div className="text-red-400 p-3 bg-red-900/20 rounded-lg">
+              <strong>Simulation Error:</strong> {simulationError}
+              <div className="text-sm mt-1">
+                {simulationError.includes('NotStarted') && 'Protocol not initialized - contact support'}
+                {simulationError.includes('FeeReceiverNotSet') && 'Fee receiver not configured - contact support'}
+                {simulationError.includes('InsufficientFundForPayout') && 'Insufficient USDC balance or allowance'}
+                {simulationError.includes('CircuitBreaker') && 'Price feed issue - try again later'}
+              </div>
             </div>
           )}
-          
-          <div className="flex flex-col gap-4">
-            <label className="text-white/80 font-medium">Asset</label>
-            <select
-              className="bg-[#232329] border border-white/10 rounded-xl px-4 py-3 text-lg text-white focus:outline-none disabled:opacity-50"
-              value={assetType}
-              onChange={e => setAssetType(e.target.value as AssetLabel)}
-              disabled={!isConnected}
-            >
-              <option value="sTSLA">sTSLA</option>
-              <option value="sAAPL">sAAPL</option>
-            </select>
-          </div>
-          
-          <div className="flex flex-col gap-4">
-            <label className="text-white/80 font-medium">{selectedChain === "sepolia" ? "USDC amount to buy Shares": "Number of Shares"}</label>
-            <input
-              type="number"
-              min="0.01"
-              step="any"
-              className="bg-[#232329] border border-white/10 rounded-xl px-4 py-3 text-lg text-white focus:outline-none disabled:opacity-50"
-              placeholder="Enter value"
-              value={shares}
-              onChange={e => setShares(e.target.value)}
-              disabled={!isConnected}
-            />
-          </div>
-          
-          {/* Simulation status */}
-          {/*isConnected && simulation.isFetching && (
-            <div className="text-yellow-400 text-sm text-center">
-              Verifying transaction parameters...
+          {(transactionError || ccipData.error) && (
+            <div className="text-red-400 p-3 bg-red-900/20 rounded-lg">
+              <strong>Transaction Error:</strong> {transactionError || ccipData.error}
             </div>
-          )*/}
-          
-          {/* Action button */}
-          <button
-            className="mt-4 bg-pink-500 hover:bg-pink-400 transition-all text-white font-bold text-lg py-3 rounded-2xl shadow-lg focus:outline-none focus:ring-2 focus:ring-pink-400/40 disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={handleOpenPosition}
-            disabled={isDisabled}
-          >
-            {!isConnected ? 'Connect Wallet' : 
-             isProcessing ? 'Processing...' : 'Open Position'}
-          </button>
-          
-          {/* Status and error messages */}
-          <div className="min-h-[100px] flex flex-col gap-2">
-            {simulationError && (
-              <div className="text-red-400 p-3 bg-red-900/20 rounded-lg">
-                <strong>Simulation Error:</strong> {simulationError}
-                <div className="text-sm mt-1">
-                  {simulationError.includes('NotStarted') && 'Protocol not initialized - contact support'}
-                  {simulationError.includes('FeeReceiverNotSet') && 'Fee receiver not configured - contact support'}
-                  {simulationError.includes('InsufficientFundForPayout') && 'Insufficient USDC balance or allowance'}
-                  {simulationError.includes('CircuitBreaker') && 'Price feed issue - try again later'}
-                </div>
-              </div>
-            )}
-            
-            {(transactionError || ccipData.error) && (
-              <div className="text-red-400 p-3 bg-red-900/20 rounded-lg">
-                <strong>Transaction Error:</strong> {transactionError || ccipData.error}
-              </div>
-            )}
-            
-            {statusMessage && (
-              <div className={`text-center p-3 rounded-lg ${
-                txReceipt.isSuccess || ccipData.hash ? 'bg-green-900/20 text-green-400' : 'text-blue-400'
-              }`}>
-                {statusMessage}
-              </div>
-            )}
-            
-            {explorerLink && (
-              <a 
-                href={explorerLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-400 hover:underline text-center"
-              >
-                {chain?.name === 'Avalanche Fuji' ? 'View on Snowtrace' : 'View on Etherscan'}
-              </a>
-            )}
-          </div>
+          )}
+          {statusMessage && (
+            <div className={`text-center p-3 rounded-lg ${
+              txReceipt.isSuccess || ccipData.hash ? 'bg-green-900/20 text-green-400' : 'text-blue-400'
+            }`}>
+              {statusMessage}
+            </div>
+          )}
+          {explorerLink && (
+            <a 
+              href={explorerLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-400 hover:underline text-center"
+            >
+              {chain?.name === 'Avalanche Fuji' ? 'View on Snowtrace' : 'View on Etherscan'}
+            </a>
+          )}
         </div>
       </div>
-    </>
+    </div>
   );
 }
 
