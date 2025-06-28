@@ -112,7 +112,7 @@ contract PerpEngine is Ownable, ReentrancyGuard {
     event VaultHedgePartialClose(address indexed vault, Utils.Asset asset, uint256 closeAmount, uint256 actualReturn, int256 pnl);
     event PositionLiquidated(address indexed user, Utils.Asset asset, uint256 positionSize, uint256 penalty);
     event PrivateBatchProcessed(uint8[] assetIds, int256[] netDeltas);
-    event ZKLiquidationExecuted(address indexed trader, uint8 indexed assetId);
+    event ZKLiquidationExecuted(uint8 assetId, int256 sizetoClose, uint256 marginToTransfer);
 
     modifier onlyVault() {
         require(msg.sender == vaultAddress, "Only vault");
@@ -362,8 +362,6 @@ contract PerpEngine is Ownable, ReentrancyGuard {
             // Net margin removed from system (traders withdrew more than deposited)
             pool.releaseTo(executor, uint256(-marginDelta));
         }
-        
-        // That's it! All other accounting (fees, funding, etc.) is handled by existing functions
     }
 
     /// --- Position Opening ---
@@ -770,56 +768,42 @@ contract PerpEngine is Ownable, ReentrancyGuard {
         emit PositionLiquidated(user, asset, positionSize, penalty);
     }
 
-    /**
-     * @notice Execute liquidation verified by ZK proof (called by PerpEngineZK)
-     * @param user Trader to liquidate  
-     * @param assetId Asset to liquidate
-     * 
-     * This reuses existing liquidation logic but skips the liquidation check
-     * since ZK proof already verified the position is liquidatable
-     */
-    function liquidateFromZK(address user, uint8 assetId) external onlyZKContract nonReentrant {
+    function liquidateFromZK(
+        uint8 assetId,
+        int256 sizeToClose,
+        uint256 marginToTransfer
+    ) external onlyZKContract nonReentrant {
         Utils.Asset asset = Utils.Asset(assetId);
-        Position storage pos = positions[user][asset];
+        uint256 currentPrice = chainlinkManager.getPrice(asset);
         
-        require(pos.sizeUsd > 0, "No position");
+        // Update open interest - reduce by the liquidated position size
+        if (sizeToClose > 0) {
+            // Liquidating a long position
+            uint256 positionSizeUint = uint256(sizeToClose);
+            longOpenInterestUsd[asset] = longOpenInterestUsd[asset] > positionSizeUint 
+                ? longOpenInterestUsd[asset] - positionSizeUint 
+                : 0;
+            longOpenInterestTokens[asset] = longOpenInterestTokens[asset] > (positionSizeUint * 1e18) / currentPrice
+                ? longOpenInterestTokens[asset] - (positionSizeUint * 1e18) / currentPrice
+                : 0;
+        } else if (sizeToClose < 0) {
+            // Liquidating a short position
+            uint256 positionSizeUint = uint256(-sizeToClose);
+            shortOpenInterestUsd[asset] = shortOpenInterestUsd[asset] > positionSizeUint
+                ? shortOpenInterestUsd[asset] - positionSizeUint
+                : 0;
+        }
         
-        // Apply funding updates before liquidation
-        _updateFundingRate(asset);
-        _applyFunding(asset, pos);
-        _applyBorrowingFee(asset, pos);
-
-        // Execute liquidation using existing logic (but skip isLiquidatable check)
-        uint256 penalty = (pos.collateral * liquidationFeeBps) / 10_000;
-        uint256 positionSize = pos.sizeUsd;
-        uint256 entryPrice = pos.entryPrice;
-        bool isLong = pos.isLong;
-
-        // Update open interest
-        if (isLong) {
-            longOpenInterestUsd[asset] -= positionSize;
-            longOpenInterestTokens[asset] -= (positionSize * 1e18) / entryPrice;
-        } else {
-            shortOpenInterestUsd[asset] -= positionSize;
+        if (marginToTransfer > 0) {
+            // Return remaining margin to liquidity pool
+            pool.releaseTo(executor,marginToTransfer);
         }
-
-        // Clear position
-        delete positions[user][asset];
-
-        // Pay liquidation rewards (existing logic)
-        uint256 liquidatorReward = (penalty * 70) / 100;
-        uint256 treasuryReward = penalty - liquidatorReward;
-
-        if (liquidatorReward > 0) {
-            pool.releaseTo(tx.origin, liquidatorReward); // tx.origin is the actual liquidator
-        }
-        if (treasuryReward > 0) {
-            require(feeReceiver != address(0), "Fee receiver unset");
-            pool.releaseTo(feeReceiver, treasuryReward);
-        }
-
-        emit ZKLiquidationExecuted(user, assetId);
-        emit PositionLiquidated(user, asset, positionSize, penalty);
+        
+        emit ZKLiquidationExecuted(
+            assetId,
+            sizeToClose,
+            marginToTransfer
+        );
     }
 
     function _calculatePositionPnL(Position memory pos, uint256 currentPrice) internal pure returns (int256 pnl) {
