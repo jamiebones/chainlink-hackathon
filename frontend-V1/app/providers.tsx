@@ -7,7 +7,7 @@ import {
   getDefaultConfig,
 } from '@rainbow-me/rainbowkit';
 import { WagmiProvider } from 'wagmi';
-import {arbitrum, arbitrumSepolia, avalanche, avalancheFuji} from 'wagmi/chains';
+import {arbitrum, arbitrumSepolia, avalanche, avalancheFuji, sepolia} from 'wagmi/chains';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { ReactNode } from 'react';
@@ -45,7 +45,7 @@ export default function Providers({ children }: { children: ReactNode }) {
     const config = getDefaultConfig({
       appName: 'sTSLA Hackathon App',
       projectId: 'e872ba5075a2eb7e208dcaeb0bd70e37',
-      chains: [avalanche, avalancheFuji,arbitrum, arbitrumSepolia],
+      chains: [avalanche, avalancheFuji,sepolia, arbitrum, arbitrumSepolia],
       ssr: false,
     });
    

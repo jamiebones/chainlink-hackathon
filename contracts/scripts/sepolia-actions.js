@@ -28,14 +28,14 @@ async function main() {
     //transfer LINKS from the deployer to the source contract;
     const linkBalance = await linkContract.balanceOf(deployer.address);
     console.log("LINK Balance:", ethers.formatEther(linkBalance));
-    const amountToTransfer = ethers.parseEther("10");
-    if (+linkBalance.toString() < (+amountToTransfer.toString())) {
-        console.error("Insufficient LINK balance for transfer.");
-        return;
-    }
-    tx = await linkContract.connect(deployer).transfer(sepoliaSourceContract, amountToTransfer);
-    await tx.wait();
-    console.log(`Transferred ${ethers.formatEther(amountToTransfer)} LINK to the source contract.`);
+    // const amountToTransfer = ethers.parseEther("10");
+    // if (+linkBalance.toString() < (+amountToTransfer.toString())) {
+    //     console.error("Insufficient LINK balance for transfer.");
+    //     return;
+    // }
+    // tx = await linkContract.connect(deployer).transfer(sepoliaSourceContract, amountToTransfer);
+    // await tx.wait();
+    // console.log(`Transferred ${ethers.formatEther(amountToTransfer)} LINK to the source contract.`);
 
     //SET THE DESTINATION 
     const usdcAmountToBuyShares = ethers.parseUnits("2", 6);
@@ -75,3 +75,4 @@ main()
         console.error(error);
         process.exit(1);
     });
+
