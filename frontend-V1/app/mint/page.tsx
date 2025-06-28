@@ -1,17 +1,25 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { ethers } from 'ethers';
 import { 
   useAccount, 
-  useWriteContract, 
+  useWriteContract,
+  useWalletClient, 
   useWaitForTransactionReceipt, 
   useSimulateContract,
   BaseError,
   useConnectorClient
 } from 'wagmi';
 import VaultABI from '../../utils/vault.json';
-
+import vaultSenderAbi from '@/abis/VaultContractSender.json'
 const VAULT_ADDRESS = "0x57ebC3E9B1260Ac811a33c0C54fD3611eC627144";
+const erc20TokenAbi = [
+  "function balanceOf(address account) view returns (uint256)",
+  "function transfer(address to, uint256 amount) returns (bool)",
+  "function approve(address spender, uint256 amount) returns (bool)",
+  "function allowance(address owner, address spender) view returns (uint256)"
+];
 
 const assetLabelToEnum = {
   sTSLA: 0, 
@@ -25,18 +33,16 @@ export default function MintPage() {
   const [assetType, setAssetType] = useState<AssetLabel>('sTSLA');
   const [simulationError, setSimulationError] = useState<string | null>(null);
   const [txError, setTxError] = useState<string | null>(null);
-  
+  const [selectedChain, setSelectedChain] = useState<'fuji' | 'sepolia'>('fuji');
+
   const { address, isConnected } = useAccount();
   const { data: connectorClient } = useConnectorClient();
+  const { data: walletClient } = useWalletClient();
 
-  // 1. Simulation hook - enabled only when wallet is connected
   const { 
     data: simulationData, 
     error: simulationErrorRaw, 
-    isError: isSimulationError,
-    refetch: simulateTransaction,
     isFetching: isSimulating,
-    status: simulationStatus
   } = useSimulateContract({
     address: VAULT_ADDRESS,
     abi: VaultABI.abi,
@@ -45,12 +51,9 @@ export default function MintPage() {
       assetLabelToEnum[assetType], 
       BigInt(Math.floor(Number(shares) * 1e18)), 
     ],
-    query: { 
-      enabled: false // We'll trigger manually
-    }
+    query: { enabled: false }
   });
 
-  // 2. Write contract hook
   const { 
     writeContract, 
     error: writeError, 
@@ -58,88 +61,118 @@ export default function MintPage() {
     data: hash 
   } = useWriteContract();
 
-  // 3. Transaction receipt hook
   const { 
     isLoading: isTxLoading, 
     isSuccess: isTxSuccess,
     error: txErrorRaw
   } = useWaitForTransactionReceipt({ hash });
 
-  // Handle simulation errors
+  useEffect(() => {
+    if (
+      isConnected &&
+      connectorClient &&
+      shares &&
+      Number(shares) > 0 &&
+      selectedChain === 'fuji'
+    ) {
+      simulateTransaction();
+    } else {
+      setSimulationError(null);
+    }
+  }, [shares, assetType, isConnected, connectorClient, selectedChain]);
+
   useEffect(() => {
     if (simulationErrorRaw) {
-      console.error("Simulation Error Details:", simulationErrorRaw);
-      
       let errorMsg = 'Simulation failed';
-      
       if (simulationErrorRaw instanceof BaseError) {
-        // Extract contract revert reason
         const revertError = simulationErrorRaw.walk(err => 
           err instanceof BaseError && err.name === 'ContractFunctionExecutionError'
         );
-        
         if (revertError) {
           errorMsg = revertError.shortMessage || revertError.message;
         } else {
           errorMsg = simulationErrorRaw.shortMessage || simulationErrorRaw.message;
         }
       }
-      
       setSimulationError(errorMsg);
     } else {
       setSimulationError(null);
     }
   }, [simulationErrorRaw]);
 
-  // Handle transaction errors
   useEffect(() => {
     if (writeError || txErrorRaw) {
       const error = writeError || txErrorRaw;
       let errorMsg = 'Transaction failed';
-      
       if (error instanceof BaseError) {
         const revertError = error.walk(err => 
           err instanceof BaseError && err.name === 'ContractFunctionExecutionError'
         );
-        
         errorMsg = revertError?.shortMessage || error.shortMessage || error.message;
       }
-      
       setTxError(errorMsg);
     } else {
       setTxError(null);
     }
   }, [writeError, txErrorRaw]);
 
-  // Trigger simulation when parameters change AND wallet is connected
-  useEffect(() => {
-    if (isConnected && connectorClient && shares && Number(shares) > 0) {
-      simulateTransaction();
-    } else {
-      setSimulationError(null);
-    }
-  }, [shares, assetType, isConnected, connectorClient]);
-
   const handleOpenPosition = async () => {
-    if (!isConnected) {
+    if (!isConnected || !connectorClient) {
       alert('Connect your wallet first');
       return;
     }
-
     if (!shares || isNaN(Number(shares)) || Number(shares) <= 0) {
       alert('Enter a valid number of shares');
       return;
     }
 
-    // If simulation was successful, write contract
-    if (simulationData?.request) {
-      writeContract(simulationData.request);
+    if (selectedChain === 'sepolia') {
+      try {
+        const usdcAmount = BigInt(Math.floor(Number(shares) * 1e6)); // assuming USDC 6 decimals
+        const vaultSenderAddress = address;
+        const receiverAddressFuji = "0x60D5A7f7f49D307e36AadAd994EF2e164a42BA54";
+        const fujiSelector = 14767482510784806043n;
+        const sepoliaSourceContract = "0xC29534f3B12658E58FEf15a454A284eC271C7297";
+
+        if (!walletClient) {
+          alert('Wallet client not available — check your connection.');
+          return;
+        }
+
+        const provider = new ethers.BrowserProvider(walletClient.transport);
+        const signer = await provider.getSigner();
+
+        const vaultSender = new ethers.Contract(sepoliaSourceContract, vaultSenderAbi, signer);
+        const usdc = new ethers.Contract("0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238", erc20TokenAbi, signer);
+
+        const allowanceTx = await usdc.approve(vaultSenderAddress, usdcAmount);
+        await allowanceTx.wait();
+
+        const positionRequest = {
+          asset: assetLabelToEnum[assetType],
+          amount: usdcAmount,
+          recipient: address,
+          fujiChainSelector: fujiSelector,
+          fujiReceiver: receiverAddressFuji
+        };
+
+        const ccipTx = await vaultSender.openPositionViaCCIP(positionRequest);
+        await ccipTx.wait();
+
+        alert("CCIP position submitted successfully!");
+      } catch (err: any) {
+        console.error("CCIP Error:", err);
+        alert(`CCIP failed: ${err.message || 'Unknown error'}`);
+      }
     } else {
-      alert('Please wait for simulation to complete');
+      if (simulationData?.request) {
+        writeContract(simulationData.request);
+      } else {
+        alert('Please wait for simulation to complete');
+      }
     }
   };
 
-  // Status messages
   let statusMsg = '';
   if (isSimulating) statusMsg = 'Simulating transaction...';
   if (isWritePending) statusMsg = 'Confirming in wallet...';
@@ -147,6 +180,20 @@ export default function MintPage() {
   if (isTxSuccess) statusMsg = 'Position opened successfully!';
 
   return (
+    <>
+      <div className="flex flex-col gap-4">
+        <label className="text-white/80 font-medium">Target Chain</label>
+        <select
+          className="bg-[#232329] border border-white/10 rounded-xl px-4 py-3 text-lg text-white focus:outline-none disabled:opacity-50"
+          value={selectedChain}
+          onChange={e => setSelectedChain(e.target.value as 'fuji' | 'sepolia')}
+          disabled={!isConnected}
+        >
+          <option value="fuji">Avalanche Fuji</option>
+          <option value="sepolia">Ethereum Sepolia</option>
+        </select>
+      </div>
+
     <div className="min-h-screen flex items-center justify-center bg-[#111112] relative overflow-hidden">
       {/* Background balls */}
       <div className="absolute inset-0 pointer-events-none z-0">
@@ -257,5 +304,6 @@ export default function MintPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }
