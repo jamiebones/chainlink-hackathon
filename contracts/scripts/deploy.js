@@ -223,8 +223,7 @@ async function main() {
     const PerpEngine = await ethers.getContractFactory("PerpEngine");
     const perpEngine = await PerpEngine.deploy(
       usdcAddressAvalancheFuji,
-      "0xEBde46FDacdc2d029fee73AD6632527E4eeB87Ab",
-      //deployments.liquidityPool,
+       deployments.liquidityPool,
       //deployments.chainlinkManager,
       "0xf0371d57b1fb08Deaf1F3AbE37c1465dC4025c45",
       deployments.vault,
@@ -277,7 +276,11 @@ async function main() {
       'sTSLA': deployments.sTSLA,
       'sAPPL': deployments.sAPPL,
       //'ChainlinkManager': deployments.chainlinkManager,
-      "ReceiverContract": deployments.receiverContract
+      "ReceiverContract": deployments.receiverContract,
+      "marketStatusOracle": "0xD1690b54a55A58df4440EE56969E3420198747D1",
+      "tslaOracle": "0x70671A042B419B266d36212337eEC2A715Af603c",
+      "aaplOracle": "0x76e6bf0aE87215ac57fE7ba900fD59Bab5C94eED",
+      "chainlinkManager": "0xf0371d57b1fb08Deaf1F3AbE37c1465dC4025c45"
     };
 
     for (const [name, address] of Object.entries(contracts)) {

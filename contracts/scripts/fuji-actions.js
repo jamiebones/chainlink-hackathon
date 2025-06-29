@@ -2,11 +2,11 @@ const { ethers } = require("hardhat");
 require("dotenv").config();
 
  const sTSLAOracleManagerAddress = "0x70671A042B419B266d36212337eEC2A715Af603c" //Fuji
- const vaultAddress = "0xa7d23A3828019976F5bdA0e2a6075F61fAbEF8b2"; //fuji
- const receiverContractAddress = "0x06e6385EB0D0AF80a25dE2eF191a5669F1d56740"; //On Fuji Chain
+ const vaultAddress = "0xFeFf49844Cf2bd6c07806f86FcDeFE55786De8a4"; //fuji
+ const receiverContractAddress = "0xDbA42976c2139Ccc9450a5867bFEb214892b8d4D"; //On Fuji Chain
  const deployer = new ethers.Wallet(process.env.DEPLOYER_PRIVATE_KEY, ethers.provider);
  const sourceChainSelector = 16015286601757825753n; 
- const vaultContractSenderAddress = "0xd168683391905a2A25D0ceEd997192B0dE782fC1" //sepolia
+ const vaultContractSenderAddress = "0x343d00b0c2fD67cA9dD1E34e2dA820F62f3f988F" //sepolia
 
  async function main() {
     //get the receiver contract and set the sourse destination🧮 
