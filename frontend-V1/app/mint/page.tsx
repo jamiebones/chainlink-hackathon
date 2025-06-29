@@ -16,10 +16,10 @@ import vaultSenderAbi from '@/abis/VaultContractSender.json';
 import { sepolia, avalancheFuji } from 'wagmi/chains';
 const CHAINS = [
   { id: 43113, name: "Avalanche Fuji" },
-  { id: 11155111, name: "Ethereum Sepolia" },
+  { id: 11155111, name: "Sepolia" },
 ];
 // Constants
-const FUJI_VAULT_ADDRESS = "0x561B0fcC18D09dBa76c68Fa0910AcFf58A1EF6E2"; // Updated to correct address
+const FUJI_VAULT_ADDRESS = "0xFeFf49844Cf2bd6c07806f86FcDeFE55786De8a4"; // Updated to correct address
 const ASSET_TYPES = {
   sTSLA: 0,
   sAAPL: 1,
@@ -28,9 +28,9 @@ type AssetLabel = keyof typeof ASSET_TYPES;
 
 const CCIP_CONFIG = {
   sepolia: {
-    receiver: "0x60D5A7f7f49D307e36AadAd994EF2e164a42BA54",
+    receiver: "0xDbA42976c2139Ccc9450a5867bFEb214892b8d4D",
     chainSelector: 14767482510784806043n,
-    senderContract: "0xC29534f3B12658E58FEf15a454A284eC271C7297",
+    senderContract: "0x343d00b0c2fD67cA9dD1E34e2dA820F62f3f988F",
     usdcAddress: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
   }
 };
@@ -39,6 +39,7 @@ const CCIP_CONFIG = {
 export default function MintPage() {
   const chainId = useChainId();
   const chain = CHAINS.find(c => c.id === chainId);
+  console.log('Current chain:', chain?.name);
   const [shares, setShares] = useState('');
   const [assetType, setAssetType] = useState<AssetLabel>('sTSLA');
   const [transactionError, setTransactionError] = useState('');
@@ -110,21 +111,30 @@ export default function MintPage() {
     }
     return error instanceof Error ? error.message : String(error);
   };
+      const liquidityPool= "0xD24FB6ebc087604af93D536B5A4562A0Dfa6Ab3a"
+      const perpEngine= "0xC707f6C9625B97FD9a214953528dfd846c2b2dD7"
+      const executeDirectTransaction = async () => {
+    if (!walletClient) throw new Error('Wallet client unavailable');
+    const provider = new ethers.BrowserProvider(walletClient.transport);
+    const signer = await provider.getSigner();
 
-  const executeDirectTransaction = () => {
-    // Create transaction request manually
-    const transactionRequest = {
-      address: FUJI_VAULT_ADDRESS as `0x${string}`,
-      abi: VaultABI.abi,
-      functionName: 'openPosition',
-      args: [
-        ASSET_TYPES[assetType],
-        BigInt(Math.floor(Number(shares) * 1e18))
-      ]
-    };
+    const vault = new ethers.Contract(FUJI_VAULT_ADDRESS, VaultABI.abi, signer);
+    const usdcAddress = "0x5425890298aed601595a70AB815c96711a31Bc65";
+    const usdc = new ethers.Contract(usdcAddress, ["function approve(address,uint256) returns (bool)"], signer);
 
-    writeContract(transactionRequest);
-  };
+    const approveAmount = BigInt(Math.floor(Number(shares) * 1e20));
+    const approveTx = await usdc.approve(FUJI_VAULT_ADDRESS, approveAmount);
+    await approveTx.wait();
+
+    const mainTx = await vault.openPosition(
+      ASSET_TYPES[assetType],
+      BigInt(Math.floor(Number(shares) * 1e6))
+    );
+
+    const receipt = await mainTx.wait();
+    setCcipData({ hash: receipt.transactionHash });
+};
+
 
   const executeCcipTransaction = useCallback(async () => {
     try {
@@ -178,7 +188,7 @@ export default function MintPage() {
     if (chain?.name === 'Avalanche Fuji' && txReceipt.isSuccess && hash) {
       return `https://testnet.snowtrace.io/tx/${hash}`;
     }
-    if (selectedChain === 'sepolia' && ccipData.hash) {
+    if (chain?.name === 'Sepolia' && ccipData.hash) {
       return `https://sepolia.etherscan.io/tx/${ccipData.hash}`;
     }
     return null;
@@ -276,7 +286,7 @@ export default function MintPage() {
                 rel="noopener noreferrer"
                 className="text-blue-400 hover:underline text-center"
               >
-                {selectedChain === 'fuji' ? 'View on Snowtrace' : 'View on Etherscan'}
+                {chain?.name === 'Avalanche Fuji' ? 'View on Snowtrace' : 'View on Etherscan'}
               </a>
             )}
           </div>
