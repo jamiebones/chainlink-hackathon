@@ -179,22 +179,12 @@ cd psiX
 pnpm install
 ~~~
 
-### 2 — Environment
-Copy `.env.example`, then fill:
-~~~dotenv
-RPC_URL_FUJI=
-RPC_URL_SEPOLIA=
-PRIVATE_KEY=
-CCIP_ROUTER=
-POSEIDON_RPC=
-~~~
-
-### 3 — Local dev-chain
+### 2 — Local dev-chain
 ~~~bash
 pnpm dev
 ~~~
 
-### 4 — Run tests
+### 3 — Run tests
 ~~~bash
 forge test -vv
 ~~~
