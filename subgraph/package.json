@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "The Graph subgraph for the Chainlink hackathon project",
   "scripts": {
+     "prebuild": "graph codegen",
     "codegen": "graph codegen",
     "build": "graph build",
     "deploy": "graph deploy",

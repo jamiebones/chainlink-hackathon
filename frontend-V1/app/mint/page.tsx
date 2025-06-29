@@ -126,10 +126,10 @@ export default function MintPage() {
     const usdcAddress = "0x5425890298aed601595a70AB815c96711a31Bc65";
     const usdc = new ethers.Contract(usdcAddress, ["function approve(address,uint256) returns (bool)"], signer);
 
-    const approveAmount = BigInt(Math.floor(Number(shares) * 1e20));
-    const approveTx = await usdc.approve(FUJI_VAULT_ADDRESS, approveAmount);
-    await approveTx.wait();
-    toast('USDC approved!', { icon: '✅' });
+    // const approveAmount = BigInt(Math.floor(Number(shares) * 1e20));
+    // const approveTx = await usdc.approve(FUJI_VAULT_ADDRESS, approveAmount);
+    // await approveTx.wait();
+    // toast('USDC approved!', { icon: '✅' });
     const mainTx = await vault.openPosition(
       ASSET_TYPES[assetType],
       BigInt(Math.floor(Number(shares) * 1e18))
