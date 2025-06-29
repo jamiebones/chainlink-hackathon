@@ -10,7 +10,7 @@ psiX lets anyone:
 
 1. **Mint synthetic equities** (sTSLA, sAAPL) with 110 % USDC collateral with a 10% buffer.  
 2. **Trade perpetual futures** on the same assets (plus ETH & BTC) via our custom **PerpEngine**.  
-3. Choose **Public Mode** (gas-efficient, transparent) or **Private Mode** (commit-reveal + zk proofs).  
+3. Choose **Public Mode** (gas-efficient, transparent) or **Private Mode** (encryption + zk proofs).  
 4. Earn yield by **providing USDC liquidity** to back leveraged traders.
 
 Deployed on Avalanche Fuji; cross-chain minting from Sepolia via Chainlink CCIP.
