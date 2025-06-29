@@ -1,7 +1,4 @@
-# 🪐 psiX – Private Synthetic Equities & Perpetual DEX
-![License](https://img.shields.io/github/license/your-org/psiX)
-![Build](https://img.shields.io/github/actions/workflow/status/your-org/psiX/ci.yml)
-![Chainlink Hackathon](https://img.shields.io/badge/Chainlink-Hackathon-2025-blue)
+# Ψ psiX – Private Synthetic Equities & Perpetual DEX
 
 > **Where synthetic stocks meet stealth trading.**  
 > Mint sTSLA & sAAPL, provide USDC liquidity, and trade perps in **public** or **fully private** mode — powered by Chainlink CCIP, Shutter encryption, and zkSNARK-verified liquidations.
@@ -144,10 +141,11 @@ sequenceDiagram
 <details><summary><strong>Private Perp Trade</strong></summary>
 
 1. Toggle “Private”.  
-2. Sign encrypted commit (Shutter).  
+2. Deposit amount, then sign the encrypted commit with your burner wallet.  
 3. BatchBot settles; zk proof verifies; UI shows fill.
 
 </details>
+
 
 <details><summary><strong>Add / Withdraw Liquidity</strong></summary>
 
@@ -264,7 +262,7 @@ PRs welcome — run `pnpm lint && pnpm test` first.
 |-------------|-----------------------------------|--------------|
 | **Lakshya** | Protocol Design & Project Manager | [LinkedIn](https://www.linkedin.com/in/lakshya-jindal-gupta-1b8134220/) |
 | **James**   | Smart Contract Developer          | [X](https://x.com/jamiescript) |
-| **Rohith**  | PerpEngine & Risk                 | — |
+| **Rohith**  | PerpEngine & Risk                 | [LinkedIn](https://www.linkedin.com/in/rohithnarahari/) |
 | **Anushka** | ZK Circuits & Chainlink           | [LinkedIn](https://www.linkedin.com/in/anushka-somani1/) |
 | **Keshav**  | Frontend                          | [LinkedIn](https://www.linkedin.com/in/keshav-bhotika-0807a61b8/) |
 
