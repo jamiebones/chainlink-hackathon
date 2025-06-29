@@ -37,11 +37,6 @@ Deployed on Avalanche Fuji; cross-chain minting from Sepolia via Chainlink CCIP.
 
 ---
 
-## 🏗 Architecture
-![Architecture Diagram](https://github.com/jamiebones/chainlink-hackathon/blob/main/psiX_architecture.webp)
-
----
-
 ## 🔄 User Workflows & Flow-Charts
 
 <details open><summary><strong>1 – Mint & Redeem</strong></summary>
