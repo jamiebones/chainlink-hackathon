@@ -38,48 +38,42 @@ export default function LiquidityLanding() {
   }, [totalLiquidity, reservedLiquidity])
 
   return (
-    <div className="min-h-screen bg-[#111014] font-[Inter,sans-serif] flex flex-col items-center justify-center relative overflow-hidden">
-      {/* Glassy Uniswap background gradients */}
+    <div className="min-h-screen relative bg-black overflow-hidden font-sans flex flex-col items-center justify-center">
+      {/* Cosmic animated background gradients (EXACT same as landing page) */}
       <div className="absolute inset-0 z-0 pointer-events-none">
-        <div className="absolute -top-24 -left-32 w-[540px] h-[400px] bg-gradient-to-tr from-pink-400/20 via-blue-400/10 to-transparent rounded-full blur-3xl" />
-        <div className="absolute top-2/3 right-1/4 w-[380px] h-[320px] bg-gradient-to-br from-purple-400/20 via-indigo-400/10 to-transparent rounded-full blur-2xl" />
-        <div className="absolute top-1/4 left-2/3 w-[280px] h-[200px] bg-gradient-to-tl from-fuchsia-400/15 via-white/0 to-transparent rounded-full blur-2xl" />
+        <div className="absolute -top-32 -left-40 w-[600px] h-[500px] bg-gradient-to-tr from-purple-500/40 via-blue-600/20 to-transparent rounded-full blur-3xl animate-pulse" />
+        <div className="absolute top-2/3 right-1/4 w-[450px] h-[380px] bg-gradient-to-br from-pink-500/30 via-purple-400/15 to-transparent rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute top-1/4 left-2/3 w-[350px] h-[280px] bg-gradient-to-tl from-cyan-400/25 via-blue-300/10 to-transparent rounded-full blur-2xl animate-pulse" style={{ animationDelay: '2s' }} />
+        <div className="absolute bottom-1/4 left-1/4 w-[300px] h-[250px] bg-gradient-to-tr from-emerald-400/20 via-teal-300/10 to-transparent rounded-full blur-2xl animate-pulse" style={{ animationDelay: '0.5s' }} />
       </div>
-      <div className="relative z-10 w-full max-w-4xl mx-auto px-4 py-14 flex flex-col items-center">
-        {/* Title and description */}
-        <h1 className="text-3xl sm:text-4xl font-extrabold mb-3 text-white tracking-tight">🪙 Liquidity Pool</h1>
-        <p className="text-slate-400 mb-10 text-center text-sm sm:text-base max-w-lg">
-          Manage your USDC liquidity across deposit, withdraw, and fee claims.
-        </p>
-        
-        {/* Main CTAs */}
-        <div className="flex flex-col sm:flex-row gap-4 w-full max-w-2xl mb-8 justify-center">
-          <ActionButton label="📥 Deposit" onClick={() => router.push('/liquidity/deposit')} />
-          <ActionButton label="📤 Withdraw" onClick={() => router.push('/liquidity/withdraw')} />
-          <ActionButton label="💰 Claim Fees" onClick={() => router.push('/liquidity/claim')} />
+      <div className="relative z-10 w-full max-w-4xl mx-auto px-4 py-16">
+        <div className="flex flex-col items-center mb-10">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse" />
+            <span className="text-sm font-semibold text-slate-400 tracking-wider uppercase">Liquidity Pool</span>
+            <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse" />
+          </div>
+          <h1 className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-purple-200 to-blue-200 mb-2 tracking-tight text-center">USDC Liquidity Pool</h1>
+          <p className="text-slate-400 text-base font-medium text-center max-w-2xl">Deposit, withdraw, and claim fees from perpetual trading activity. Your capital powers the protocol.</p>
         </div>
-        
-        {/* Clickable cards for power users (optional, looks cool) */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-10 w-full max-w-2xl">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 mb-12">
           <GlassyCard
             label="📥 Deposit"
-            desc="Add USDC to the pool and earn a share of trading fees."
+            desc="Add USDC to the pool and earn fees."
             onClick={() => router.push('/liquidity/deposit')}
           />
           <GlassyCard
             label="📤 Withdraw"
-            desc="Redeem your LP tokens for USDC, anytime."
+            desc="Redeem your LP tokens for USDC."
             onClick={() => router.push('/liquidity/withdraw')}
           />
           <GlassyCard
             label="💰 Claim Fees"
-            desc="Collect your accumulated trading fees."
+            desc="Collect your share of trading fees."
             onClick={() => router.push('/liquidity/claim')}
           />
         </div>
-
-        {/* Pool Stats Section */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 w-full max-w-2xl">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
           <StatCard title="💧 Total Liquidity" value={`$${liquidity}`} />
           <StatCard title="🔒 Reserved Liquidity" value={`$${reserved}`} />
           <StatCard title="📊 Utilization" value={`${utilization}%`} />
@@ -101,11 +95,13 @@ function GlassyCard({
   return (
     <button
       onClick={onClick}
-      className="w-full h-full rounded-2xl bg-white/10 hover:bg-white/15 border border-white/10 shadow-xl
-      transition-all duration-200 px-6 py-8 flex flex-col items-start text-left cursor-pointer group backdrop-blur-xl"
+      className="w-full h-full rounded-2xl border border-white/10 shadow-xl transition-all duration-200 px-6 py-8 flex flex-col items-start text-left cursor-pointer group backdrop-blur-xl bg-white/10 hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-purple-500/40"
+      style={{ position: 'relative', overflow: 'hidden' }}
     >
-      <span className="font-semibold text-lg text-white mb-2 group-hover:underline">{label}</span>
-      <span className="text-slate-400 text-sm">{desc}</span>
+      {/* Cosmic gradient overlay for button (matches landing page) */}
+      <span className="absolute inset-0 z-0 rounded-2xl bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 opacity-60 group-hover:opacity-80 transition-all duration-200" />
+      <span className="relative z-10 font-semibold text-lg text-white mb-2 group-hover:underline">{label}</span>
+      <span className="relative z-10 text-slate-200 text-sm">{desc}</span>
     </button>
   )
 }
@@ -120,8 +116,7 @@ function ActionButton({
   return (
     <button
       onClick={onClick}
-      className="flex-1 px-6 py-3 rounded-xl bg-gradient-to-r from-pink-400/80 to-blue-400/80
-      text-white text-lg font-bold shadow-md hover:scale-105 hover:shadow-xl transition-all duration-150 outline-none focus:ring-2 focus:ring-pink-400/40"
+      className="flex-1 px-6 py-3 rounded-xl bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 text-white text-lg font-bold shadow-md hover:scale-105 hover:shadow-xl transition-all duration-150 outline-none focus:ring-2 focus:ring-pink-400/40"
     >
       {label}
     </button>

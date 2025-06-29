@@ -54,49 +54,38 @@ export default function DepositPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#111014] font-[Inter,sans-serif] relative overflow-hidden">
-      {/* Glassy Uniswap background */}
+    <div className="min-h-screen relative bg-gradient-to-br from-black via-slate-950/80 to-gray-950 overflow-hidden font-sans flex items-center justify-center">
+      {/* Animated star field */}
       <div className="absolute inset-0 z-0 pointer-events-none">
-        <div className="absolute -top-24 -left-32 w-[540px] h-[400px] bg-gradient-to-tr from-pink-400/20 via-blue-400/10 to-transparent rounded-full blur-3xl" />
-        <div className="absolute top-2/3 right-1/4 w-[380px] h-[320px] bg-gradient-to-br from-purple-400/20 via-indigo-400/10 to-transparent rounded-full blur-2xl" />
-        <div className="absolute top-1/4 left-2/3 w-[280px] h-[200px] bg-gradient-to-tl from-fuchsia-400/15 via-white/0 to-transparent rounded-full blur-2xl" />
+        <div className="absolute -top-32 -left-40 w-[600px] h-[500px] bg-gradient-to-tr from-purple-500/30 via-blue-600/15 to-transparent rounded-full blur-3xl animate-pulse" />
+        <div className="absolute top-2/3 right-1/4 w-[450px] h-[380px] bg-gradient-to-br from-pink-500/25 via-purple-400/10 to-transparent rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute top-1/4 left-2/3 w-[350px] h-[280px] bg-gradient-to-tl from-cyan-400/20 via-blue-300/5 to-transparent rounded-full blur-2xl animate-pulse" style={{ animationDelay: '2s' }} />
+        <div className="absolute bottom-1/4 left-1/4 w-[300px] h-[250px] bg-gradient-to-tr from-emerald-400/15 via-teal-300/8 to-transparent rounded-full blur-2xl animate-pulse" style={{ animationDelay: '0.5s' }} />
       </div>
-      <div className="relative z-10 w-full max-w-md mx-auto p-8 flex flex-col items-center">
-        <div className="w-full bg-white/10 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl p-8 flex flex-col gap-7 items-center">
-          <h1 className="text-2xl font-extrabold mb-2 text-white tracking-tight">
-            Deposit to Liquidity Pool
-          </h1>
-          <p className="text-slate-400 mb-5 text-sm text-center">
-            Provide USDC to earn fees from perpetual traders.
-          </p>
-          <div className="w-full">
-            <label className="block text-sm font-medium mb-2 text-slate-300">USDC Amount</label>
+      <div className="relative z-10 w-full max-w-md mx-auto glassy-card p-8 border border-slate-800/60 shadow-2xl backdrop-blur-xl">
+        <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-purple-200 to-blue-200 mb-2 text-center tracking-tight">Deposit to Liquidity Pool</h1>
+        <p className="text-slate-400 mb-8 text-base font-medium text-center">
+          Provide USDC to earn fees from perpetual traders.
+        </p>
+        <div className="space-y-6">
+          <div>
+            <label className="block text-sm font-semibold mb-1 text-slate-300 tracking-wide">USDC Amount</label>
             <input
               type="number"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              className="w-full px-4 py-3 bg-black/20 border border-white/15 rounded-lg text-white text-base focus:outline-none focus:ring-2 focus:ring-green-400"
+              className="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-4 py-3 text-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-400/40"
               placeholder="Enter amount"
               min="0"
               step="0.01"
-              disabled={loading}
             />
           </div>
           <button
             onClick={handleDeposit}
             disabled={loading || !amount || parseFloat(amount) <= 0}
-            className={`w-full py-3 rounded-xl font-bold text-lg transition-all shadow-md
-              ${loading || !amount || parseFloat(amount) <= 0
-                ? 'bg-slate-600 text-slate-400 cursor-not-allowed'
-                : 'bg-gradient-to-r from-green-400 to-blue-400 text-black hover:scale-105 hover:shadow-xl'}
-            `}
+            className={`w-full py-3 rounded-xl font-bold text-lg bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 text-white shadow-lg hover:from-pink-500 hover:to-purple-500 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-400/40 ${loading || !amount || parseFloat(amount) <= 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
-            {loading ? (
-              <span className="flex items-center justify-center">
-                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>
-                Processing...
-              </span>
-            ) : 'Deposit USDC'}
+            {loading ? 'Processing...' : 'Deposit USDC'}
           </button>
         </div>
       </div>

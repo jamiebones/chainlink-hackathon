@@ -228,150 +228,148 @@ export default function PrivateTradePage() {
   };
 
   return (
-    <div className="px-4 xl:px-16 py-8">
-      <div className="flex items-center justify-between bg-[#1f1f23] border border-white/10 rounded-2xl px-6 py-4 mb-6 shadow-md">
-        <div>
-          <h2 className="text-xl font-semibold text-white flex items-center gap-2">
-            🕶️ Incognito Mode
-            <span className="text-sm font-normal text-slate-400">Private Trading Enabled</span>
-          </h2>
-          <p className="text-sm text-slate-400 mt-1">Your trade details and wallet address will remain hidden on-chain.</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <input type="number" min="0" step="0.01" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)}
-            placeholder="Deposit USDC" className="w-32 px-3 py-2 border border-white/10 rounded-lg text-white text-sm bg-slate-800" />
-          <button onClick={handleDeposit} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">Deposit</button>
-          <div className="text-white text-sm">
-            {balanceLoading ? 'Loading...' : userBalance ? `Available: ${(Number(userBalance.available) / 1e6).toFixed(2)} USDC` : 'Failed to load balance'}
-          </div>
-        </div>
+    <div className="min-h-screen relative bg-black overflow-hidden font-sans flex items-center justify-center">
+      {/* Cosmic animated background gradients (EXACT same as landing page) */}
+      <div className="absolute inset-0 z-0 pointer-events-none">
+        <div className="absolute -top-32 -left-40 w-[600px] h-[500px] bg-gradient-to-tr from-purple-500/40 via-blue-600/20 to-transparent rounded-full blur-3xl animate-pulse" />
+        <div className="absolute top-2/3 right-1/4 w-[450px] h-[380px] bg-gradient-to-br from-pink-500/30 via-purple-400/15 to-transparent rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute top-1/4 left-2/3 w-[350px] h-[280px] bg-gradient-to-tl from-cyan-400/25 via-blue-300/10 to-transparent rounded-full blur-2xl animate-pulse" style={{ animationDelay: '2s' }} />
+        <div className="absolute bottom-1/4 left-1/4 w-[300px] h-[250px] bg-gradient-to-tr from-emerald-400/20 via-teal-300/10 to-transparent rounded-full blur-2xl animate-pulse" style={{ animationDelay: '0.5s' }} />
       </div>
-
-      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
-        <div className="xl:col-span-3">
-          <MarketChart symbol={asset === 'TSLA' ? 'TSLA' : 'AAPL'} />
-        </div>
-        <div className="bg-[#18181b]/90 border border-white/10 rounded-2xl p-6 shadow-2xl w-full">
-          <h2 className="text-lg font-semibold text-white mb-4">Private Trade</h2>
-          <div className="flex bg-[#232329]/80 rounded-lg p-1 mb-4">
-            {['long', 'short'].map((d) => (
-              <button
-                key={d}
-                onClick={() => setDirection(d)}
-                className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
-                  direction === d
-                    ? d === 'long'
-                      ? 'bg-green-500 text-white shadow-lg'
-                      : 'bg-red-500 text-white shadow-lg'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
-                }`}
-              >
-                {d.toUpperCase()}
-              </button>
-            ))}
-          </div>
-
-          <select
-            value={asset}
-            onChange={(e) => setAsset(e.target.value)}
-            className="w-full mb-4 px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm"
-          >
-            <option value="TSLA">TSLA / USDC</option>
-            <option value="APPL">APPL / USDC</option>
-          </select>
-
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
-            className="w-full px-3 py-2 mb-4 border border-white/10 rounded-lg text-white text-sm"
-            placeholder="Quantity"
-          />
-
-          <input
-            type="range"
-            min="1"
-            max="10"
-            step="1"
-            value={leverage}
-            onChange={(e) => setLeverage(e.target.value)}
-            className="w-full h-2 mb-2 bg-white rounded-lg appearance-none cursor-pointer"
-          />
-          <div className="text-sm text-white text-center mb-6">Leverage: {leverage}x</div>
-
-          <div className="rounded-lg p-3 space-y-2 bg-[#232329]/60 mb-6">
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-400">Entry Price</span>
-              <span className="text-white">${entryPrice}</span>
+      <div className="relative z-10 w-full max-w-5xl mx-auto glassy-card p-8 border border-white/10 shadow-2xl backdrop-blur-xl rounded-3xl">
+        <h1 className="text-3xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-purple-200 to-blue-200 mb-2 text-center tracking-tight">Private Trading</h1>
+        <p className="text-slate-400 mb-8 text-base font-medium text-center">Trade privately with encrypted order batching and zk settlement.</p>
+        <div className="flex flex-col md:flex-row gap-8 mb-8">
+          <div className="flex-1 flex flex-col gap-6">
+            <div className="bg-white/10 border border-white/10 rounded-2xl px-6 py-4 shadow-xl backdrop-blur-xl">
+              <h2 className="text-xl font-semibold text-white flex items-center gap-2 mb-1">
+                🕶️ Incognito Mode
+                <span className="text-sm font-normal text-slate-400">Private Trading Enabled</span>
+              </h2>
+              <p className="text-sm text-slate-400 mb-3">Your trade details and wallet address will remain hidden on-chain.</p>
+              <div className="flex items-center gap-3">
+                <input type="number" min="0" step="0.01" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)}
+                  placeholder="Deposit USDC" className="w-32 px-3 py-2 border border-white/10 rounded-lg text-white text-sm bg-slate-900/80 backdrop-blur-md focus:ring-2 focus:ring-purple-500/40" />
+                <button onClick={handleDeposit} className="px-4 py-2 font-bold rounded-xl bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 text-white shadow-lg hover:scale-105 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-400/40 text-sm">Deposit</button>
+                <div className="text-white text-sm">
+                  {balanceLoading ? 'Loading...' : userBalance ? `Available: ${(Number(userBalance.available) / 1e6).toFixed(2)} USDC` : 'Failed to load balance'}
+                </div>
+              </div>
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-400">Collateral Required</span>
-              <span className="text-yellow-400">${collateralRequired.toFixed(2)} USDC</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-400">Estimated Fee</span>
-              <span className="text-white">${estimatedFee.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-400">Liq. Price</span>
-              <span className="text-red-400">${liquidationPrice.toFixed(2)}</span>
+            <div className="bg-white/10 border border-white/10 rounded-2xl p-4 shadow-xl backdrop-blur-xl">
+              <h3 className="text-white text-lg font-semibold mb-3">Your Positions</h3>
+              {positionsLoading ? (
+                <p className="text-slate-400 text-sm">Loading positions...</p>
+              ) : positions.length === 0 ? (
+                <p className="text-slate-400 text-sm">No active positions</p>
+              ) : (
+                positions.map((pos, idx) => (
+                  <div key={idx} className="p-3 mb-3 bg-white/5 rounded-lg">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-400">Asset</span>
+                      <span className="text-white">{pos.assetId === 0 ? 'TSLA' : 'AAPL'}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-400">Side</span>
+                      <span className={`${pos.isLong ? 'text-green-400' : 'text-red-400'}`}>{pos.isLong ? 'Long' : 'Short'}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-400">Size</span>
+                      <span className="text-white">{(Number(pos.size) / 1e6).toFixed(2)} USD</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-400">Margin</span>
+                      <span className="text-yellow-400">{(Number(pos.margin) / 1e6).toFixed(2)} USDC</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-400">Entry Price</span>
+                      <span className="text-white">${(Number(pos.entryPrice) / 1e18).toFixed(2)}</span>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
-
-          <button
-            onClick={sendTrade}
-            disabled={loading}
-            className="w-full py-3 rounded-lg font-medium text-sm bg-pink-600 text-white hover:bg-pink-700"
-          >
-            {loading ? 'Processing...' : 'Send Private Trade'}
-          </button>
-          <button
-           onClick={handleClosePosition}
-           disabled={loading}
-           className="w-full py-3 rounded-lg font-medium text-sm bg-yellow-600 text-white hover:bg-yellow-700 mt-2"
-           >
-           Close Position
-           </button>
-        </div>
-          {/* Include your sendTrade & handleClosePosition buttons */}
-        </div>
-
-      <div className="bg-[#1f1f23]/80 border border-white/10 rounded-2xl p-4 mt-6 shadow-md">
-        <h3 className="text-white text-lg font-semibold mb-3">Your Positions</h3>
-        {positionsLoading ? (
-          <p className="text-slate-400 text-sm">Loading positions...</p>
-        ) : positions.length === 0 ? (
-          <p className="text-slate-400 text-sm">No active positions</p>
-        ) : (
-          positions.map((pos, idx) => (
-            <div key={idx} className="p-3 mb-3 bg-[#232329]/60 rounded-lg">
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-400">Asset</span>
-                <span className="text-white">{pos.assetId === 0 ? 'TSLA' : 'AAPL'}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-400">Side</span>
-                <span className={`${pos.isLong ? 'text-green-400' : 'text-red-400'}`}>
-                  {pos.isLong ? 'Long' : 'Short'}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-400">Size</span>
-                <span className="text-white">{(Number(pos.size) / 1e6).toFixed(2)} USD</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-400">Margin</span>
-                <span className="text-yellow-400">{(Number(pos.margin) / 1e6).toFixed(2)} USDC</span>
-              </div>
+          <div className="flex-1 bg-white/10 border border-white/10 rounded-2xl p-6 shadow-2xl w-full flex flex-col backdrop-blur-xl">
+            <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-purple-200 to-blue-200 mb-4 text-center tracking-tight">Private Trade</h2>
+            <div className="flex bg-white/5 rounded-lg p-1 mb-4">
+              {['long', 'short'].map((d) => (
+                <button
+                  key={d}
+                  onClick={() => setDirection(d)}
+                  className={`flex-1 px-4 py-2 text-sm font-bold rounded-md transition-all duration-200 ${
+                    direction === d
+                      ? d === 'long'
+                        ? 'bg-green-500 text-white shadow-lg'
+                        : 'bg-red-500 text-white shadow-lg'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
+                  }`}
+                >
+                  {d.toUpperCase()}
+                </button>
+              ))}
+            </div>
+            <select
+              value={asset}
+              onChange={(e) => setAsset(e.target.value)}
+              className="w-full mb-4 px-3 py-2 bg-slate-900/80 border border-slate-600 rounded-lg text-white text-sm backdrop-blur-md focus:ring-2 focus:ring-purple-500/40"
+            >
+              <option value="TSLA">TSLA / USDC</option>
+              <option value="APPL">APPL / USDC</option>
+            </select>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              className="w-full px-3 py-2 mb-4 border border-white/10 rounded-lg text-white text-sm bg-slate-900/80 backdrop-blur-md focus:ring-2 focus:ring-purple-500/40"
+              placeholder="Quantity"
+            />
+            <input
+              type="range"
+              min="1"
+              max="10"
+              step="1"
+              value={leverage}
+              onChange={(e) => setLeverage(e.target.value)}
+              className="w-full h-2 mb-2 bg-white rounded-lg appearance-none cursor-pointer"
+            />
+            <div className="text-sm text-white text-center mb-6">Leverage: {leverage}x</div>
+            <div className="rounded-lg p-3 space-y-2 bg-white/5 mb-6">
               <div className="flex justify-between text-sm">
                 <span className="text-slate-400">Entry Price</span>
-                <span className="text-white">${(Number(pos.entryPrice) / 1e18).toFixed(2)}</span>
+                <span className="text-white">${entryPrice}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-400">Collateral Required</span>
+                <span className="text-yellow-400">${collateralRequired.toFixed(2)} USDC</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-400">Estimated Fee</span>
+                <span className="text-white">${estimatedFee.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-400">Liq. Price</span>
+                <span className="text-red-400">${liquidationPrice.toFixed(2)}</span>
               </div>
             </div>
-          ))
-        )}
+            <button
+              onClick={sendTrade}
+              disabled={loading}
+              className="w-full py-3 rounded-xl font-bold text-lg bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 text-white shadow-lg hover:scale-105 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-400/40 mb-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Processing...' : 'Send Private Trade'}
+            </button>
+            <button
+              onClick={handleClosePosition}
+              disabled={loading}
+              className="w-full py-3 rounded-xl font-bold text-lg bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 text-white shadow-lg hover:scale-105 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-400/40 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Close Position
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
