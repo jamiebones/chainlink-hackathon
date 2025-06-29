@@ -8,7 +8,7 @@
 ## 🚀 Overview
 psiX lets anyone:
 
-1. **Mint synthetic equities** (sTSLA, sAAPL) with 110 % USDC collateral.  
+1. **Mint synthetic equities** (sTSLA, sAAPL) with 110 % USDC collateral with a 10% buffer.  
 2. **Trade perpetual futures** on the same assets (plus ETH & BTC) via our custom **PerpEngine**.  
 3. Choose **Public Mode** (gas-efficient, transparent) or **Private Mode** (commit-reveal + zk proofs).  
 4. Earn yield by **providing USDC liquidity** to back leveraged traders.
@@ -159,15 +159,9 @@ Deposit USDC → receive LP tokens → earn fees & funding share → withdraw an
 ## 📂 Repository Structure
 ~~~text
 ├─ contracts/            # Solidity sources
-│  ├─ Vault.sol
-│  ├─ PerpEngine.sol
-│  └─ …
 ├─ frontend/             # Next.js app
-│  ├─ components/
-│  └─ pages/
-├─ bots/                 # BatchBot, Keeper scripts
-├─ scripts/              # Deploy & upgrade helpers
-├─ docs/                 # Architecture & flow-chart images
+├─ backend/executor      # BatchBot, Executor Bot
+├─ backend/circuits      # ZK circuits
 └─ README.md
 ~~~
 
@@ -213,11 +207,19 @@ forge test -vv
 ---
 
 ## 🔗 Contracts & Addresses (Fuji)
-| Contract      | Address                                      | Source    |
-|---------------|----------------------------------------------|-----------|
-| Vault         | `0x9005aA9B6C40369F6486856093C59aA0e8598D88` | Etherscan |
-| PerpEngine    | `0xB9485C15cAF89Fb90be7CE14B336975F4FAE8D8f` | Etherscan |
-| LiquidityPool | *TBD*                                        | —         |
+| Contract      | Address                                      |
+|---------------|----------------------------------------------|
+| Vault         | `0xFeFf49844Cf2bd6c07806f86FcDeFE55786De8a4` |
+| PerpEngine    | `0xC707f6C9625B97FD9a214953528dfd846c2b2dD7` |
+| LiquidityPool | `0xD24FB6ebc087604af93D536B5A4562A0Dfa6Ab3a` |
+| PerpEngineZk  | `0xf5aD2EC0a0c763127667D71952CC80078356153c` |
+| SenderContract| `0x343d00b0c2fD67cA9dD1E34e2dA820F62f3f988F` |
+| MarketStatusOracle| `0xD1690b54a55A58df4440EE56969E3420198747D1` |
+| TslaPriceOralce| `0x70671A042B419B266d36212337eEC2A715Af603c` |
+| ApplPriceOracle| `0x76e6bf0aE87215ac57fE7ba900fD59Bab5C94eED` |
+| sTSLA | `0xffd0528B468E8820324dD27E71d68CC8d4F9Eb85` |
+| sAPPL| `0xba52894c5319d2263bcaAbF609767c33b3A04993` |
+| ReceiverContract(On sepolia)| `0xDbA42976c2139Ccc9450a5867bFEb214892b8d4D` |
 
 ---
 
@@ -239,18 +241,29 @@ forge test -vv
 ## 🛡 Security Considerations
 - Overflow-safe math; no unchecked external calls.  
 - Role-based access for CCIP router & KeeperBots.  
-- Foundry fuzz tests on funding, collateral, liquidations.  
-- Audit before main-net.
+- Foundry fuzz tests on funding, collateral, and liquidations.  
+- Audit before mainnet.
 
 ---
 
-## 🗺 Roadmap
-- [x] MVP (sTSLA, sAAPL) on Fuji  
-- [x] CCIP Sepolia bridge  
-- [x] Private Mode beta  
-- [ ] ETH/BTC perps (Q3 2025)  
-- [ ] Avalanche Subnet deploy (Q4 2025)
+## 🗺️ Roadmap
 
+### Completed ✅
+- [x] **MVP Launch** - synthetic assets on Avalanche Fuji
+- [x] **Fully-Functional Perpetuals on Fuji**   
+- [x] **Cross-Chain Bridge** - CCIP integration with Ethereum Sepolia
+- [x] **Private Mode Beta** - HPKE encryption + ZK proof batching + liquidation with ZK proofs
+
+### **Q3 2025: Perpetuals** 🚀
+- Expand beyond synthetic equities to crypto perpetuals
+- Higher volume/liquidity crypto markets
+- Leverage existing privacy infrastructure for BTC/ETH trading
+
+### **Q4 2025: Security Improvements** ⛓️
+- Custom Avalanche subnet for private trading
+- Lower costs & higher throughput
+- Enhanced privacy with custom consensus
+  
 ---
 
 ## 🤝 Contributing
