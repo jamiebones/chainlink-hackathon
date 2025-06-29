@@ -27,7 +27,7 @@ export default function LandingPage() {
           transition={{ duration: 0.7 }}
           style={{ fontFamily: 'Inter, Geist, sans-serif', letterSpacing: '-0.03em' }}
         >
-          CipherSynth
+          PsiX
         </motion.h1>
         <motion.div
           className="text-lg md:text-xl font-medium text-white/60 mb-12 text-center"

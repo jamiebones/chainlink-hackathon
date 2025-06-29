@@ -4,7 +4,7 @@ import { useWriteContract, useAccount } from 'wagmi'
 import { useState } from 'react'
 import abi from '@/abis/LiquidityPool.json'
 
-const LIQ_POOL = '0x04825CDa198D4134f6Bb914f097b9ab141825bF4'
+const LIQ_POOL = '0xD24FB6ebc087604af93D536B5A4562A0Dfa6Ab3a'
 const ABI = abi.abi
 
 export default function ClaimPage() {

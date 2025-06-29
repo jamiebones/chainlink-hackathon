@@ -73,7 +73,7 @@ export default function Providers({ children }: { children: ReactNode }) {
           <header className="w-full sticky top-0 z-50 bg-[#111112] border-b border-white/10 shadow-sm">
             <div className="max-w-7xl mx-auto flex justify-between items-center px-6 py-4">
               <div className="flex items-center gap-10">
-                <h1 className="text-2xl font-bold text-white tracking-tight">sTSLA Dashboard</h1>
+                <h1 className="text-2xl font-bold text-white tracking-tight">PsiX Dashboard</h1>
                 <nav className="flex gap-6">
                     <a href="/mint" className="text-white/80 hover:text-white px-3 py-2 rounded transition-colors font-medium">Mint</a>
                     <a href="/trade" className="text-white/80 hover:text-white px-3 py-2 rounded transition-colors font-medium">Trade</a>

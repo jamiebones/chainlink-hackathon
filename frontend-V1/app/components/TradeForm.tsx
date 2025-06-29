@@ -7,8 +7,8 @@ import abiJson from '@/abis/PerpEngine.json'
 import abiJson2 from '@/abis/MockERc20.json'
 const PerpEngineABI = abiJson.abi
 const usdcAbi = abiJson2.abi
-const PerpAdd = '0xB9485C15cAF89Fb90be7CE14B336975F4FAE8D8f'
-const UsdcAdd = '0xDD655EC06411cA3468E641A974d66804414Cb2A2'
+const PerpAdd = '0xC707f6C9625B97FD9a214953528dfd846c2b2dD7'
+const UsdcAdd = '0x5425890298aed601595a70AB815c96711a31Bc65'
 type Direction = 'long' | 'short'
 const ASSET_ENUM = {
   TSLA: 0,
@@ -28,7 +28,7 @@ export default function TradeForm({
   const [isLoading, setIsLoading] = useState(false)
   // Fetch TSLA price from Chainlink Oracle
   const tslaPriceData = useReadContract({
-    address: '0x671db3340e1f84257c263DBBd46bFE4D5ffA777E', // TSLAOracleManager
+    address: '0x70671A042B419B266d36212337eEC2A715Af603c', // TSLAOracleManager
     abi: [
       {
         "inputs": [],
@@ -43,7 +43,7 @@ export default function TradeForm({
   })
   // Fetch AAPL price from Chainlink Oracle
   const aaplPriceData = useReadContract({
-    address: '0xd91D3a89A24c305c8d8e6Fc34d19866a747496ba', // AAPLOracleManager
+    address: '0x76e6bf0aE87215ac57fE7ba900fD59Bab5C94eED', // AAPLOracleManager
     abi: [
       {
         "inputs": [],
@@ -63,8 +63,8 @@ export default function TradeForm({
   const qty = parseFloat(quantity || '0')
   const lev = parseFloat(leverage || '1')
   const positionSize = qty * ENTRY_PRICE
-  const leverageFactor = Math.round(lev * 1e6);
-  const collateralRequired = positionSize * 1e6 / leverageFactor;
+  const leverageFactor = Math.round(lev);
+  const collateralRequired = positionSize / leverageFactor;
   const estimatedFee = positionSize * 0.001
   const liquidationPrice = lev ? (ENTRY_PRICE * (1 - 0.9 / lev)) : 0
 
@@ -127,6 +127,8 @@ const handleTrade = async () => {
 
     const hasPosition = positionData.data && positionData.data[0] > 0n
     console.log(hasPosition);
+    // console.log(parseUnits(collateralRequired.toString(), 6));
+    // console.log(parseUnits(positionSize.toString(), 6));
     // CASE 1: no position → openPosition
     if (!hasPosition) {
       await writeContractAsync({
@@ -200,7 +202,7 @@ const handleTrade = async () => {
     try {
       setIsLoading(true)
       await writeContractAsync({
-        address: '0xB9485C15cAF89Fb90be7CE14B336975F4FAE8D8f', // PerpEngine address
+        address: PerpAdd, // PerpEngine address
         abi: PerpEngineABI,
         functionName: 'closePosition',
         args: [ASSET_ENUM[symbol]],
