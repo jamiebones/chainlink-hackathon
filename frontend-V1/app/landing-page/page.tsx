@@ -181,7 +181,7 @@ export default function LandingPage() {
 
         <div className="text-center mb-16">
           <h1 className="text-6xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-purple-200 to-blue-200 mb-6 tracking-tight leading-tight">
-            PsiX
+            psiX
           </h1>
           <div className="text-sm font-medium text-purple-400/80 mb-3 tracking-widest uppercase">
             Advanced DeFi Protocol

@@ -8,7 +8,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en">
       <body>
         <Providers>
-           <Toaster position="top-center" reverseOrder={false} />
+           <Toaster position="top-right" reverseOrder={false} />
         {children}
         </Providers>
         

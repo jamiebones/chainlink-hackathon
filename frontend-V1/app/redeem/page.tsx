@@ -41,7 +41,7 @@ export default function RedeemStockPage() {
     functionName: 'redeemStock',
     args: [
       assetLabelToEnum[assetType],
-      BigInt(Math.floor(Number(stockToRedeem) * 1e18)),
+      BigInt(Math.floor(Number(stockToRedeem) * 1e14)),
     ],
     query: { enabled: false }
   });
