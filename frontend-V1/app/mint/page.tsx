@@ -4,18 +4,20 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
 import {
   useAccount,
-import {
-  useAccount,
   useWriteContract,
   useWalletClient,
   useWaitForTransactionReceipt,
   BaseError,
-  useConnectorClient
+  useConnectorClient,
+  useChainId 
 } from 'wagmi';
 import VaultABI from '../../utils/vault.json';
 import vaultSenderAbi from '@/abis/VaultContractSender.json';
 import { sepolia, avalancheFuji } from 'wagmi/chains';
-
+const CHAINS = [
+  { id: 43113, name: "Avalanche Fuji" },
+  { id: 11155111, name: "Ethereum Sepolia" },
+];
 // Constants
 const FUJI_VAULT_ADDRESS = "0x561B0fcC18D09dBa76c68Fa0910AcFf58A1EF6E2"; // Updated to correct address
 const ASSET_TYPES = {
@@ -49,11 +51,6 @@ export default function MintPage() {
   const { data: walletClient } = useWalletClient();
 
   // Transaction hooks
-  const {
-    writeContract,
-    error: writeError,
-    isPending: isWritePending,
-    data: hash
   const {
     writeContract,
     error: writeError,
@@ -285,6 +282,6 @@ export default function MintPage() {
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }
