@@ -132,7 +132,7 @@ export default function MintPage() {
     toast('USDC approved!', { icon: '✅' });
     const mainTx = await vault.openPosition(
       ASSET_TYPES[assetType],
-      BigInt(Math.floor(Number(shares) * 1e15))
+      BigInt(Math.floor(Number(shares) * 1e18))
     );
     toast.loading('Opening position...', { id: 'tx' });
     const receipt = await mainTx.wait();
