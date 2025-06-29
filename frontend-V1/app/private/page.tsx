@@ -10,8 +10,8 @@ import MarketChart from '../components/MarketChart';
 import abiJson2 from '@/abis/MockERc20.json'
 import {useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 const usdcAbi = abiJson2.abi
-const UsdcAdd = '0xDD655EC06411cA3468E641A974d66804414Cb2A2'
-const ExAdd = '0x14D24C79be77CD4fE8d544CAd5ab0b7b0aCd50Fe'
+const UsdcAdd = '0x5425890298aed601595a70AB815c96711a31Bc65'
+const ExAdd = '0x40BDC27880A522B4346844A96aDAB92DcEDB1664'
 const suite = new CipherSuite({
   kem: new DhkemX25519HkdfSha256(),
   kdf: new HkdfSha256(),

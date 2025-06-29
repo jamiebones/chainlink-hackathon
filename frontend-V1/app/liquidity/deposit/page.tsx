@@ -6,8 +6,8 @@ import { parseUnits } from 'viem'
 import poolAbiJson from '@/abis/LiquidityPool.json'
 import usdcAbiJson from '@/abis/MockERc20.json'
 
-const LIQ_POOL = '0x04825CDa198D4134f6Bb914f097b9ab141825bF4'
-const USDC_TOKEN = '0xae68c3d71bb66c75492Af7626c0eAAF918Ec4630'
+const LIQ_POOL = '0xD24FB6ebc087604af93D536B5A4562A0Dfa6Ab3a'
+const USDC_TOKEN = '0x5425890298aed601595a70AB815c96711a31Bc65'
 
 const POOL_ABI = poolAbiJson.abi
 const USDC_ABI = usdcAbiJson.abi
@@ -41,7 +41,7 @@ export default function DepositPage() {
         address: LIQ_POOL,
         abi: POOL_ABI,
         functionName: 'deposit',
-        args: [usdcAmount],
+        args: [1e6*amount],
       })
       alert('✅ Deposit successful!')
       setAmount('')
