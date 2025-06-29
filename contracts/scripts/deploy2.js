@@ -14,7 +14,7 @@ const colors = {
   cyan: "\x1b[36m"
 };
 
-const receiverContractAddress = "0x06e6385EB0D0AF80a25dE2eF191a5669F1d56740";  //address of the receiver contract on Fuji
+const receiverContractAddress = "0xDbA42976c2139Ccc9450a5867bFEb214892b8d4D";  //address of the receiver contract on Fuji
 
 //const { router, donId, gasLimit } = network.config;
 
