@@ -14,6 +14,8 @@ import {
 import VaultABI from '../../utils/vault.json';
 import vaultSenderAbi from '@/abis/VaultContractSender.json';
 import { sepolia, avalancheFuji } from 'wagmi/chains';
+import toast, { Toaster } from 'react-hot-toast';
+
 const CHAINS = [
   { id: 43113, name: "Avalanche Fuji" },
   { id: 11155111, name: "Sepolia" },
@@ -74,16 +76,17 @@ export default function MintPage() {
   // Transaction execution
   const handleOpenPosition = async () => {
     if (!validateInputs()) return;
-
     setTransactionError('');
     setCcipData({});
     try {
+      toast.loading('Processing transaction...', { id: 'tx' });
       if (chain?.name === 'Sepolia') {
         await executeCcipTransaction();
       } else {
-        executeDirectTransaction();
+        await executeDirectTransaction();
       }
     } catch (error: any) {
+      toast.error(error.message || 'Transaction failed', { id: 'tx' });
       setTransactionError(error.message || 'Transaction failed');
     }
   };
@@ -126,13 +129,14 @@ export default function MintPage() {
     const approveAmount = BigInt(Math.floor(Number(shares) * 1e20));
     const approveTx = await usdc.approve(FUJI_VAULT_ADDRESS, approveAmount);
     await approveTx.wait();
-
+    toast('USDC approved!', { icon: '✅' });
     const mainTx = await vault.openPosition(
       ASSET_TYPES[assetType],
-      BigInt(Math.floor(Number(shares) * 1e6))
+      BigInt(Math.floor(Number(shares) * 1e15))
     );
-
+    toast.loading('Opening position...', { id: 'tx' });
     const receipt = await mainTx.wait();
+    toast.success('Position opened successfully!', { id: 'tx' });
     setCcipData({ hash: receipt.transactionHash });
 };
 
@@ -155,10 +159,9 @@ export default function MintPage() {
 
       const approveTx = await usdc.approve(senderContract, usdcAmount);
       await approveTx.wait();
-
+      toast('USDC approved!', { icon: '✅' });
       // CCIP Position Opening
       const vaultSender = new ethers.Contract(senderContract, vaultSenderAbi, signer);
-
       const positionRequest = {
         asset: ASSET_TYPES[assetType],
         amount: usdcAmount,
@@ -166,16 +169,23 @@ export default function MintPage() {
         fujiChainSelector: chainSelector,
         fujiReceiver: receiver
       };
+      toast.loading('Submitting CCIP position...', { id: 'tx' });
       const ccipTx = await vaultSender.openPositionViaCCIP(positionRequest);
       const receipt = await ccipTx.wait();
-
+      toast.success('CCIP position submitted!', { id: 'tx' });
       setCcipData({ hash: receipt.hash });
-      alert("Position submitted via CCIP successfully!");
     } catch (error: any) {
+      toast.error(error.message || 'CCIP transaction failed', { id: 'tx' });
       setCcipData({ error: error.message || 'CCIP transaction failed' });
       throw error;
     }
   }, [shares, assetType, address, walletClient]);
+
+  useEffect(() => {
+    if (simulationError) {
+      toast.error('Simulation error: ' + simulationError);
+    }
+  }, [simulationError]);
 
   // Status messages & explorer link
   const getStatusMessage = () => {
@@ -201,90 +211,93 @@ export default function MintPage() {
   const isDisabled = !isConnected || isProcessing || !shares;
 
   return (
-    <div className="min-h-screen relative bg-gradient-to-br from-black via-slate-950/80 to-gray-950 overflow-hidden font-sans flex items-center justify-center">
-      {/* Animated star field */}
-      <div className="absolute inset-0 z-0 pointer-events-none">
-        <div className="absolute -top-32 -left-40 w-[600px] h-[500px] bg-gradient-to-tr from-purple-500/30 via-blue-600/15 to-transparent rounded-full blur-3xl animate-pulse" />
-        <div className="absolute top-2/3 right-1/4 w-[450px] h-[380px] bg-gradient-to-br from-pink-500/25 via-purple-400/10 to-transparent rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
-        <div className="absolute top-1/4 left-2/3 w-[350px] h-[280px] bg-gradient-to-tl from-cyan-400/20 via-blue-300/5 to-transparent rounded-full blur-2xl animate-pulse" style={{ animationDelay: '2s' }} />
-        <div className="absolute bottom-1/4 left-1/4 w-[300px] h-[250px] bg-gradient-to-tr from-emerald-400/15 via-teal-300/8 to-transparent rounded-full blur-2xl animate-pulse" style={{ animationDelay: '0.5s' }} />
-      </div>
-      <div className="relative z-10 w-full max-w-md mx-auto glassy-card p-8 flex flex-col gap-6 border border-slate-800/60 shadow-2xl backdrop-blur-xl">
-        <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-purple-200 to-blue-200 mb-2 text-center tracking-tight">Open Position</h2>
-        {!isConnected && (
-          <div className="text-center py-4 text-yellow-400 font-semibold">
-            Connect your wallet to begin
-          </div>
-        )}
-        <div className="flex flex-col gap-4">
-          <label className="text-white/80 font-semibold tracking-wide">Asset</label>
-          <select
-            className="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-4 py-3 text-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-400/40 disabled:opacity-50"
-            value={assetType}
-            onChange={e => setAssetType(e.target.value as AssetLabel)}
-            disabled={!isConnected}
-          >
-            <option value="sTSLA">sTSLA</option>
-            <option value="sAAPL">sAAPL</option>
-          </select>
+    <>
+      <Toaster position="top-right" />
+      <div className="min-h-screen relative bg-gradient-to-br from-black via-slate-950/80 to-gray-950 overflow-hidden font-sans flex items-center justify-center">
+        {/* Animated star field */}
+        <div className="absolute inset-0 z-0 pointer-events-none">
+          <div className="absolute -top-32 -left-40 w-[600px] h-[500px] bg-gradient-to-tr from-purple-500/30 via-blue-600/15 to-transparent rounded-full blur-3xl animate-pulse" />
+          <div className="absolute top-2/3 right-1/4 w-[450px] h-[380px] bg-gradient-to-br from-pink-500/25 via-purple-400/10 to-transparent rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+          <div className="absolute top-1/4 left-2/3 w-[350px] h-[280px] bg-gradient-to-tl from-cyan-400/20 via-blue-300/5 to-transparent rounded-full blur-2xl animate-pulse" style={{ animationDelay: '2s' }} />
+          <div className="absolute bottom-1/4 left-1/4 w-[300px] h-[250px] bg-gradient-to-tr from-emerald-400/15 via-teal-300/8 to-transparent rounded-full blur-2xl animate-pulse" style={{ animationDelay: '0.5s' }} />
         </div>
-        <div className="flex flex-col gap-4">
-          <label className="text-white/80 font-semibold tracking-wide">{chain?.name === "Sepolia" ? "USDC amount to buy Shares": "Number of Shares"}</label>
-          <input
-            type="number"
-            min="0.01"
-            step="any"
-            className="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-4 py-3 text-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-400/40 disabled:opacity-50"
-            placeholder="Enter value"
-            value={shares}
-            onChange={e => setShares(e.target.value)}
-            disabled={!isConnected}
-          />
-        </div>
-        <button
-          className="w-full py-3 rounded-xl font-bold text-lg bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 text-white shadow-lg hover:from-pink-500 hover:to-purple-500 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-400/40 disabled:opacity-50 disabled:cursor-not-allowed"
-          onClick={handleOpenPosition}
-          disabled={isDisabled}
-        >
-          {!isConnected ? 'Connect Wallet' : 
-           isProcessing ? 'Processing...' : 'Open Position'}
-        </button>
-        <div className="min-h-[100px] flex flex-col gap-2">
-          {simulationError && (
-            <div className="text-red-400 p-3 bg-red-900/20 rounded-lg font-semibold">
-              <strong>Simulation Error:</strong> {simulationError}
-              <div className="text-sm mt-1">
-                {simulationError.includes('NotStarted') && 'Protocol not initialized - contact support'}
-                {simulationError.includes('FeeReceiverNotSet') && 'Fee receiver not configured - contact support'}
-                {simulationError.includes('InsufficientFundForPayout') && 'Insufficient USDC balance or allowance'}
-                {simulationError.includes('CircuitBreaker') && 'Price feed issue - try again later'}
-              </div>
+        <div className="relative z-10 w-full max-w-md mx-auto glassy-card p-8 flex flex-col gap-6 border border-slate-800/60 shadow-2xl backdrop-blur-xl">
+          <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-purple-200 to-blue-200 mb-2 text-center tracking-tight">Open Position</h2>
+          {!isConnected && (
+            <div className="text-center py-4 text-yellow-400 font-semibold">
+              Connect your wallet to begin
             </div>
           )}
-          {(transactionError || ccipData.error) && (
-            <div className="text-red-400 p-3 bg-red-900/20 rounded-lg font-semibold">
-              <strong>Transaction Error:</strong> {transactionError || ccipData.error}
-            </div>
-          )}
-          {statusMessage && (
-            <div className={`text-center p-3 rounded-lg font-semibold ${
-              txReceipt.isSuccess || ccipData.hash ? 'bg-green-900/20 text-green-400' : 'text-blue-400'
-            }`}>
-              {statusMessage}
-            </div>
-          )}
-          {explorerLink && (
-            <a 
-              href={explorerLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-400 hover:underline text-center font-semibold"
+          <div className="flex flex-col gap-4">
+            <label className="text-white/80 font-semibold tracking-wide">Asset</label>
+            <select
+              className="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-4 py-3 text-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-400/40 disabled:opacity-50"
+              value={assetType}
+              onChange={e => setAssetType(e.target.value as AssetLabel)}
+              disabled={!isConnected}
             >
-              {chain?.name === 'Avalanche Fuji' ? 'View on Snowtrace' : 'View on Etherscan'}
-            </a>
-          )}
+              <option value="sTSLA">sTSLA</option>
+              <option value="sAAPL">sAAPL</option>
+            </select>
+          </div>
+          <div className="flex flex-col gap-4">
+            <label className="text-white/80 font-semibold tracking-wide">{chain?.name === "Sepolia" ? "USDC amount to buy Shares": "Number of Shares"}</label>
+            <input
+              type="number"
+              min="0.01"
+              step="any"
+              className="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-4 py-3 text-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-400/40 disabled:opacity-50"
+              placeholder="Enter value"
+              value={shares}
+              onChange={e => setShares(e.target.value)}
+              disabled={!isConnected}
+            />
+          </div>
+          <button
+            className="w-full py-3 rounded-xl font-bold text-lg bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 text-white shadow-lg hover:from-pink-500 hover:to-purple-500 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-400/40 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleOpenPosition}
+            disabled={isDisabled}
+          >
+            {!isConnected ? 'Connect Wallet' : 
+             isProcessing ? 'Processing...' : 'Open Position'}
+          </button>
+          <div className="min-h-[100px] flex flex-col gap-2">
+            {simulationError && (
+              <div className="text-red-400 p-3 bg-red-900/20 rounded-lg font-semibold">
+                <strong>Simulation Error:</strong> {simulationError}
+                <div className="text-sm mt-1">
+                  {simulationError.includes('NotStarted') && 'Protocol not initialized - contact support'}
+                  {simulationError.includes('FeeReceiverNotSet') && 'Fee receiver not configured - contact support'}
+                  {simulationError.includes('InsufficientFundForPayout') && 'Insufficient USDC balance or allowance'}
+                  {simulationError.includes('CircuitBreaker') && 'Price feed issue - try again later'}
+                </div>
+              </div>
+            )}
+            {(transactionError || ccipData.error) && (
+              <div className="text-red-400 p-3 bg-red-900/20 rounded-lg font-semibold">
+                <strong>Transaction Error:</strong> {transactionError || ccipData.error}
+              </div>
+            )}
+            {statusMessage && (
+              <div className={`text-center p-3 rounded-lg font-semibold ${
+                txReceipt.isSuccess || ccipData.hash ? 'bg-green-900/20 text-green-400' : 'text-blue-400'
+              }`}>
+                {statusMessage}
+              </div>
+            )}
+            {explorerLink && (
+              <a 
+                href={explorerLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-400 hover:underline text-center font-semibold"
+              >
+                {chain?.name === 'Avalanche Fuji' ? 'View on Snowtrace' : 'View on Etherscan'}
+              </a>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
