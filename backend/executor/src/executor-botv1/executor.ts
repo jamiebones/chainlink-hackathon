@@ -46,7 +46,7 @@ export class MinimalExecutor {
   private batchCounter = 0;
   
   private readonly BATCH_SIZE = 5;
-  private readonly BATCH_TIMEOUT = 30000;
+  private readonly BATCH_TIMEOUT = 120000;
   private batchTimer: NodeJS.Timeout | null = null;
 
   constructor() {
@@ -117,7 +117,7 @@ export class MinimalExecutor {
       // Step 7: Check if we should process batch
       if (this.pendingTrades.length >= this.BATCH_SIZE) {
         console.log('🚀 Batch size reached, processing immediately...');
-        setTimeout(() => this.processBatch(), 100);
+        setTimeout(() => this.processBatch(), 120000);
       }
 
       return processedTrade;
@@ -342,10 +342,6 @@ export class MinimalExecutor {
     // Size limits
     const minSize = 10n * 10n ** 6n; // $10 minimum
     const maxSize = 100000n * 10n ** 6n; // $100k maximum
-
-    if (qty < minSize) {
-      errors.push(`Position too small: $${Number(qty)/1e6} < $${Number(minSize)/1e6}`);
-    }
 
     if (qty > maxSize) {
       errors.push(`Position too large: $${Number(qty)/1e6} > $${Number(maxSize)/1e6}`);
