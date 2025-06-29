@@ -31,6 +31,7 @@
   "license": "MIT",
   "description": "Chainlink Hackathon Monorepo with contracts, subgraph, and frontend",
   "dependencies": {
+    "lucide-react": "^0.525.0",
     "react-hot-toast": "^2.5.2"
   }
 }

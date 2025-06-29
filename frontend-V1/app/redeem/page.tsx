@@ -11,7 +11,7 @@ import {
 } from 'wagmi';
 import VaultABI from '../../utils/vault.json';
 
-const VAULT_ADDRESS = "0x57ebC3E9B1260Ac811a33c0C54fD3611eC627144";
+const VAULT_ADDRESS = "0xFeFf49844Cf2bd6c07806f86FcDeFE55786De8a4";
 
 const assetLabelToEnum = {
   sTSLA: 0, 
@@ -153,17 +153,19 @@ export default function RedeemStockPage() {
   if (isTxSuccess) statusMsg = 'Stock redeemed successfully!';
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative bg-[#111014] font-[Inter,sans-serif] overflow-hidden">
-      {/* Uniswap-style blurred gradients */}
-      <div className="absolute inset-0 pointer-events-none z-0">
-        <div className="absolute -top-24 -left-32 w-[540px] h-[400px] bg-gradient-to-tr from-pink-400/20 via-blue-400/10 to-transparent rounded-full blur-3xl" />
-        <div className="absolute top-2/3 right-1/4 w-[380px] h-[320px] bg-gradient-to-br from-purple-400/20 via-indigo-400/10 to-transparent rounded-full blur-2xl" />
-        <div className="absolute top-1/4 left-2/3 w-[280px] h-[200px] bg-gradient-to-tl from-fuchsia-400/15 via-white/0 to-transparent rounded-full blur-2xl" />
+    <div className="min-h-screen relative bg-gradient-to-br from-black via-slate-950/80 to-gray-950 overflow-hidden font-sans flex items-center justify-center">
+      {/* Animated star field */}
+      <div className="absolute inset-0 z-0 pointer-events-none">
+        <div className="absolute -top-32 -left-40 w-[600px] h-[500px] bg-gradient-to-tr from-purple-500/30 via-blue-600/15 to-transparent rounded-full blur-3xl animate-pulse" />
+        <div className="absolute top-2/3 right-1/4 w-[450px] h-[380px] bg-gradient-to-br from-pink-500/25 via-purple-400/10 to-transparent rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute top-1/4 left-2/3 w-[350px] h-[280px] bg-gradient-to-tl from-cyan-400/20 via-blue-300/5 to-transparent rounded-full blur-2xl animate-pulse" style={{ animationDelay: '2s' }} />
+        <div className="absolute bottom-1/4 left-1/4 w-[300px] h-[250px] bg-gradient-to-tr from-emerald-400/15 via-teal-300/8 to-transparent rounded-full blur-2xl animate-pulse" style={{ animationDelay: '0.5s' }} />
       </div>
-      <div className="relative z-10 w-full max-w-md mx-auto rounded-3xl bg-white/10 border border-white/10 shadow-2xl p-8 flex flex-col gap-7 backdrop-blur-xl">
-        <h2 className="text-2xl font-extrabold text-white mb-2 text-center tracking-tight">
-          Redeem Stock
-        </h2>
+      <div className="relative z-10 w-full max-w-md mx-auto glassy-card p-8 border border-slate-800/60 shadow-2xl backdrop-blur-xl">
+        <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-purple-200 to-blue-200 mb-2 text-center tracking-tight">Redeem Synth</h1>
+        <p className="text-slate-400 mb-8 text-base font-medium text-center">
+          Redeem your synthetic assets for USDC.
+        </p>
         {!isConnected && (
           <div className="text-center py-4 text-yellow-300 bg-yellow-500/10 rounded-lg font-medium">
             Connect your wallet to begin
