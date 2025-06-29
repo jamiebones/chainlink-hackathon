@@ -14,10 +14,10 @@ const deployer = new ethers.Wallet(process.env.DEPLOYER_PRIVATE_KEY, ethers.prov
 
 
 const fujiDestinationChainSelector = 14767482510784806043n; // Avalanche Fuji testnet chain selector
-const receiverContractAddress = "0x60D5A7f7f49D307e36AadAd994EF2e164a42BA54"; //receiver contract address on Fuji
+const receiverContractAddress = "0x06e6385EB0D0AF80a25dE2eF191a5669F1d56740"; //receiver contract address on Fuji
 const allowance = ethers.parseEther("10000000000");
 
-const sepoliaSourceContract = "0xC29534f3B12658E58FEf15a454A284eC271C7297"; //vaultContractSender addresss on sepolia
+const sepoliaSourceContract = "0xd168683391905a2A25D0ceEd997192B0dE782fC1"; //vaultContractSender addresss on sepolia
 
 async function main() {
     let tx;
@@ -28,14 +28,14 @@ async function main() {
     //transfer LINKS from the deployer to the source contract;
     const linkBalance = await linkContract.balanceOf(deployer.address);
     console.log("LINK Balance:", ethers.formatEther(linkBalance));
-    // const amountToTransfer = ethers.parseEther("10");
-    // if (+linkBalance.toString() < (+amountToTransfer.toString())) {
-    //     console.error("Insufficient LINK balance for transfer.");
-    //     return;
-    // }
-    // tx = await linkContract.connect(deployer).transfer(sepoliaSourceContract, amountToTransfer);
-    // await tx.wait();
-    // console.log(`Transferred ${ethers.formatEther(amountToTransfer)} LINK to the source contract.`);
+    const amountToTransfer = ethers.parseEther("10");
+    if (+linkBalance.toString() < (+amountToTransfer.toString())) {
+        console.error("Insufficient LINK balance for transfer.");
+        return;
+    }
+    tx = await linkContract.connect(deployer).transfer(sepoliaSourceContract, amountToTransfer);
+    await tx.wait();
+    console.log(`Transferred ${ethers.formatEther(amountToTransfer)} LINK to the source contract.`);
 
     //SET THE DESTINATION 
     const usdcAmountToBuyShares = ethers.parseUnits("2", 6);

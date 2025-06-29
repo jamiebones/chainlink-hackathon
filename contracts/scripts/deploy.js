@@ -33,7 +33,7 @@ const CONFIG = {
   chainlinkSubscriptionId: 15656, // Update with your subscription ID
 
   // Initial liquidity amounts
-  initialLiquidityUSDC: ethers.parseUnits("2", 6), // 100000000000 USDC
+  initialLiquidityUSDC: ethers.parseUnits("10", 6), // 100000000000 USDC
 
   // Team addresses
   treasury: null, // Will use deployer if not set
@@ -45,6 +45,15 @@ const CONFIG = {
   // Fee configuration
   lpShare: 7000, // 70%
   protocolShare: 3000, // 30%
+};
+
+const colors = {
+  reset: "\x1b[0m",
+  bright: "\x1b[1m",
+  green: "\x1b[32m",
+  yellow: "\x1b[33m",
+  red: "\x1b[31m",
+  cyan: "\x1b[36m"
 };
 
 // Helper function to execute transactions with proper nonce management
@@ -111,37 +120,37 @@ async function main() {
     console.log(`${colors.bright}2. Deploying Oracle Infrastructure...${colors.reset}`);
 
     // Deploy MarketStatusOracle
-    const MarketStatusOracle = await ethers.getContractFactory("MarketStatusOracle");
-    const marketStatusOracle = await MarketStatusOracle.deploy(
-      avalancheFujiRouter,
-      avalancheFujiDonID,
-    );
-    await marketStatusOracle.waitForDeployment();
-    deployments.marketStatusOracle = await marketStatusOracle.getAddress();
-    console.log(`✅ MarketStatusOracle deployed at: ${deployments.marketStatusOracle}`);
+    // const MarketStatusOracle = await ethers.getContractFactory("MarketStatusOracle");
+    // const marketStatusOracle = await MarketStatusOracle.deploy(
+    //   avalancheFujiRouter,
+    //   avalancheFujiDonID,
+    // );
+    // await marketStatusOracle.waitForDeployment();
+    // deployments.marketStatusOracle = await marketStatusOracle.getAddress();
+    // console.log(`✅ MarketStatusOracle deployed at: ${deployments.marketStatusOracle}`);
 
     // Deploy TSLAOracleManager
-    const TSLAOracleManager = await ethers.getContractFactory("TSLAOracleManager");
-    const tslaOracle = await TSLAOracleManager.deploy(
-      CONFIG.oracleWindowSize,
-      deployments.marketStatusOracle,
-      avalancheFujiRouter,
-      avalancheFujiDonID,
-    );
-    await tslaOracle.waitForDeployment();
-    deployments.tslaOracle = await tslaOracle.getAddress();
-    console.log(`✅ TSLAOracleManager deployed at: ${deployments.tslaOracle}`);
+    // const TSLAOracleManager = await ethers.getContractFactory("TSLAOracleManager");
+    // const tslaOracle = await TSLAOracleManager.deploy(
+    //   CONFIG.oracleWindowSize,
+    //   deployments.marketStatusOracle,
+    //   avalancheFujiRouter,
+    //   avalancheFujiDonID,
+    // );
+    // await tslaOracle.waitForDeployment();
+    // deployments.tslaOracle = await tslaOracle.getAddress();
+    // console.log(`✅ TSLAOracleManager deployed at: ${deployments.tslaOracle}`);
 
     // Deploy AAPLOracleManager
-    const AAPLOracleManager = await ethers.getContractFactory("AAPLOracleManager");
-    const aaplOracle = await AAPLOracleManager.deploy(
-      CONFIG.oracleWindowSize,
-      avalancheFujiRouter,
-      avalancheFujiDonID,
-    );
-    await aaplOracle.waitForDeployment();
-    deployments.aaplOracle = await aaplOracle.getAddress();
-    console.log(`✅ AAPLOracleManager deployed at: ${deployments.aaplOracle}`);
+    // const AAPLOracleManager = await ethers.getContractFactory("AAPLOracleManager");
+    // const aaplOracle = await AAPLOracleManager.deploy(
+    //   CONFIG.oracleWindowSize,
+    //   avalancheFujiRouter,
+    //   avalancheFujiDonID,
+    // );
+    // await aaplOracle.waitForDeployment();
+    // deployments.aaplOracle = await aaplOracle.getAddress();
+    // console.log(`✅ AAPLOracleManager deployed at: ${deployments.aaplOracle}`);
 
     //Deploy the Utils library;
     const Utils = await ethers.getContractFactory("Utils");
@@ -152,19 +161,19 @@ async function main() {
     // Deploy ChainlinkManager
     //const ChainlinkManager = await ethers.getContractFactory("ChainlinkManager");
 
-    const ChainlinkManager = await ethers.getContractFactory("ChainlinkManager", {
-      libraries: {
-        "lib/Utils.sol:Utils": utilsAddress,
-      },
-    });
-    const chainlinkManager = await ChainlinkManager.deploy(
-      deployments.tslaOracle,
-      deployments.aaplOracle,
-      deployments.marketStatusOracle
-    );
-    await chainlinkManager.waitForDeployment();
-    deployments.chainlinkManager = await chainlinkManager.getAddress();
-    console.log(`✅ ChainlinkManager deployed at: ${deployments.chainlinkManager}\n`);
+    // const ChainlinkManager = await ethers.getContractFactory("ChainlinkManager", {
+    //   libraries: {
+    //     "lib/Utils.sol:Utils": utilsAddress,
+    //   },
+    // });
+    // const chainlinkManager = await ChainlinkManager.deploy(
+    //   deployments.tslaOracle,
+    //   deployments.aaplOracle,
+    //   deployments.marketStatusOracle
+    // );
+    // await chainlinkManager.waitForDeployment();
+    // deployments.chainlinkManager = await chainlinkManager.getAddress();
+    // console.log(`✅ ChainlinkManager deployed at: ${deployments.chainlinkManager}\n`);
 
 
     // ========================================
@@ -188,7 +197,8 @@ async function main() {
     const vault = await Vault.deploy(
       usdcAddressAvalancheFuji,
       deployer.address,
-      deployments.chainlinkManager
+      "0xf0371d57b1fb08Deaf1F3AbE37c1465dC4025c45"
+      //deployments.chainlinkManager
     );
     await vault.waitForDeployment();
     deployments.vault = await vault.getAddress();
@@ -200,7 +210,8 @@ async function main() {
       avalanceFujiRouterContractAddress,
       usdcAddressAvalancheFuji,
       deployments.vault,
-      deployments.chainlinkManager
+      "0xf0371d57b1fb08Deaf1F3AbE37c1465dC4025c45"
+      //deployments.chainlinkManager
     );
 
     await receiverContract.waitForDeployment();
@@ -212,8 +223,10 @@ async function main() {
     const PerpEngine = await ethers.getContractFactory("PerpEngine");
     const perpEngine = await PerpEngine.deploy(
       usdcAddressAvalancheFuji,
-      deployments.liquidityPool,
-      deployments.chainlinkManager,
+      "0xEBde46FDacdc2d029fee73AD6632527E4eeB87Ab",
+      //deployments.liquidityPool,
+      //deployments.chainlinkManager,
+      "0xf0371d57b1fb08Deaf1F3AbE37c1465dC4025c45",
       deployments.vault,
       feeReceiver.address,
       executor.address
@@ -226,7 +239,8 @@ async function main() {
     const perpEngineZk = await PerpEngineZk.deploy(
       deployer.address,  // needs to be updated to verifier
       deployments.perpEngine,
-      usdc.getAddress()
+      usdcAddressAvalancheFuji
+      //usdc.getAddress()
     );
     await perpEngineZk.waitForDeployment();
     deployments.perpEngineZk = await perpEngineZk.getAddress();
@@ -256,13 +270,13 @@ async function main() {
 
     // Verify all contracts are properly deployed
     const contracts = {
-      'LiquidityPool': deployments.liquidityPool,
+      //'LiquidityPool': deployments.liquidityPool,
       'Vault': deployments.vault,
       'PerpEngine': deployments.perpEngine,
       'PerpEngineZk': deployments.perpEngineZk,
       'sTSLA': deployments.sTSLA,
       'sAPPL': deployments.sAPPL,
-      'ChainlinkManager': deployments.chainlinkManager,
+      //'ChainlinkManager': deployments.chainlinkManager,
       "ReceiverContract": deployments.receiverContract
     };
 
@@ -394,7 +408,7 @@ async function main() {
       tx = await perpEngine.setVaultAddress(deployments.vault);
       await tx.wait();
       console.log("setVaultAddress completed");
-      await perpEngine.setPerpEngineZk(perpEngineZkContract.address);
+      await perpEngine.setPerpEngineZk(deployments.perpEngineZk);
       console.log("setPerpEngineZk completed");
     } catch (perpError) {
       console.log("❌ PerpEngine configuration failed:", perpError);
@@ -434,8 +448,11 @@ async function main() {
     console.log("Approving USDC...");
     const approvalTx = await usdcContract.connect(lpProvider).approve(
       deployments.liquidityPool,
-      CONFIG.initialLiquidityUSDC
+      ethers.parseUnits("10000000000000000", 6)
+      //CONFIG.initialLiquidityUSDC
     );
+
+    await approvalTx.wait();
 
     // Verify approval
     const allowance = await usdcContract.allowance(lpProvider.address, deployments.liquidityPool);
@@ -532,7 +549,7 @@ async function main() {
     console.log(`PerpEngineZk: ${deployments.perpEngineZk}`);
     console.log(`sTSLA: ${deployments.sTSLA}`);
     console.log(`sAPPL: ${deployments.sAPPL}`);
-    console.log(`ChainlinkManager: ${deployments.chainlinkManager}`);
+    //console.log(`ChainlinkManager: ${deployments.chainlinkManager}`);
     console.log(`Receiver Contract: ${deployments.receiverContract}`);
 
     return deployments;

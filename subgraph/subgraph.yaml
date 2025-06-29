@@ -6,7 +6,7 @@ dataSources:
     name: Vault
     network: fuji
     source:
-      address: "0x561B0fcC18D09dBa76c68Fa0910AcFf58A1EF6E2"
+      address: "0xa7d23A3828019976F5bdA0e2a6075F61fAbEF8b2"
       abi: Vault
       startBlock: 42498578
     mapping:
@@ -45,7 +45,7 @@ dataSources:
     name: PerpEngine
     network: fuji
     source:
-      address: "0x2c59F4032B279344491684e5d752d8cf1e5AE15a" # <<< REPLACE ME
+      address: "0xc7096160D18DE311b7E847308a5e606eAd518EEF" # <<< REPLACE ME
       abi: PerpEngine
       startBlock: 42498588 
     mapping:
@@ -83,7 +83,7 @@ dataSources:
     name: ReceiverContract
     network: fuji
     source:
-      address: "0x60D5A7f7f49D307e36AadAd994EF2e164a42BA54" # <<< REPLACE ME
+      address: "0x06e6385EB0D0AF80a25dE2eF191a5669F1d56740" # <<< REPLACE ME
       abi: ReceiverContract
       startBlock: 42498583
     mapping:
