@@ -1,7 +1,7 @@
-# Ψ psiX – Private Synthetic Equities & Perpetual DEX
+# ψ psiX – Private Synthetic Equities & Perpetual DEX
 
 > **Where synthetic stocks meet stealth trading.**  
-> Mint sTSLA & sAAPL, provide USDC liquidity, and trade perps in **public** or **fully private** mode — powered by Chainlink CCIP, Shutter encryption, and zkSNARK-verified liquidations.
+> Mint sTSLA & sAAPL, provide USDC liquidity, and trade perps in **public** or **fully private** mode — powered by Chainlink CCIP, HPKE encryption, and zkSNARK-verified liquidations.
 
 ---
 
@@ -23,22 +23,22 @@ Deployed on Avalanche Fuji; cross-chain minting from Sepolia via Chainlink CCIP.
 | **Vault**         | Mints/burns sEquity, routes 1× hedge, holds 10 % funding buffer           | `Vault.sol`   |
 | **PerpEngine**    | Long/short perps, funding, liquidations, oracle checks                    | `PerpEngine.sol` |
 | **LiquidityPool** | USDC pool for PerpEngine PnL & LP rewards                                 | `LiquidityPool.sol` |
-| **Privacy Layer** | Shutter encrypted commit-reveal, batch-bot netting, zk liquidation proofs | `BatchBot.ts`, `PerpEngineZK.verifier` |
-| **CCIP Bridge**   | Cross-chain mint/redeem (Sepolia ⇄ Fuji)                                  | `openPositionViaCCIP()` |
+| **Privacy Layer** | HPKE-encrypted commit-reveal, BatchBot netting, zk liquidation proofs     | `BatchBot.ts`, `PerpEngineZK.verifier` |
+| **CCIP Bridge**   | Cross-chain mint/redeem (Sepolia ⇄ Fuji)                                   | `openPositionViaCCIP()` |
 
 ---
 
 ## 🛠 Technical Stack
 - **Smart Contracts:** Solidity 0.8.x, Foundry tests  
-- **Backend / Bots:** TypeScript, Node 22, Shutter keyper set, Chainlink Functions  
+- **Backend / Bots:** TypeScript, Node 22, BatchBot, Poseidon HPKE service, Chainlink Functions  
 - **Frontend:** Next.js 18, Tailwind CSS, wagmi, viem  
-- **Infra:** Hardhat devnet, Dockerised Shutter, CCIP Router, Avalanche Subnet (future)  
+- **Infra:** Hardhat devnet, Dockerised Poseidon, CCIP Router, Avalanche Subnet (future)  
 - **ZK:** snarkjs + circom 2 for liquidation proofs  
 
 ---
 
 ## 🏗 Architecture
-_Embed a high-level system diagram here → `docs/architecture.png`_
+![Architecture Diagram](docs/architecture.png)
 
 ---
 
@@ -106,15 +106,17 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     participant Trader
-    participant Shutter
+    participant Wallet
     participant BatchBot
+    participant Poseidon
     participant PerpEngine
     participant Verifier
 
-    Trader->>Shutter: encrypt(order)
-    Shutter-->>Trader: commitHash
-    Trader->>BatchBot: submit commit
-    BatchBot->>PerpEngine: net Δ settle
+    Trader->>Wallet: encOpenOrder + sig (HPKE)
+    Wallet->>BatchBot: submit commit
+    BatchBot->>Poseidon: decrypt & verify
+    Poseidon->>Poseidon: insert / update leaf
+    Poseidon->>PerpEngine: tradeNet(±Δ)
     BatchBot->>Verifier: zkProof
     Verifier-->>PerpEngine: verify OK
 ~~~
@@ -125,7 +127,7 @@ sequenceDiagram
 ## 📝 Quick User Guides
 <details><summary><strong>Mint & Redeem</strong></summary>
 
-- **Mint:** Connect wallet → “Mint” → deposit ≥110 % collateral → confirm.  
+- **Mint:** Connect wallet → “Mint” → deposit ≥ 110 % collateral → confirm.  
 - **Redeem:** Click “Redeem” → select amount → burn sEquity → receive USDC.
 
 </details>
@@ -145,7 +147,6 @@ sequenceDiagram
 3. BatchBot settles; zk proof verifies; UI shows fill.
 
 </details>
-
 
 <details><summary><strong>Add / Withdraw Liquidity</strong></summary>
 
@@ -180,7 +181,7 @@ Deposit USDC → receive LP tokens → earn fees & funding share → withdraw an
 | Node | ≥ 22 |
 | pnpm | ≥ 9.14 |
 | Foundry | nightly |
-| Docker | for Shutter dev-net |
+| Docker | for Poseidon dev-net |
 
 ### 1 — Clone & Install
 ~~~bash
@@ -195,8 +196,8 @@ Copy `.env.example`, then fill:
 RPC_URL_FUJI=
 RPC_URL_SEPOLIA=
 PRIVATE_KEY=
-SHUTTER_RPC=
 CCIP_ROUTER=
+POSEIDON_RPC=
 ~~~
 
 ### 3 — Local dev-chain
@@ -222,16 +223,16 @@ forge test -vv
 
 ## 🧩 Peg Maintenance
 - Vault hedges 1× at mint → minimal delta.  
-- KeeperBots arbitrage ±0.5 % peg drift.  
+- KeeperBots arbitrage ± 0.5 % peg drift.  
 - 10 % buffer covers funding swings.
 
 ---
 
 ## 🔒 Privacy Mode Deep-Dive
-1. Commit stored hashed.  
-2. Shutter encrypts details; key revealed post-batch.  
-3. BatchBot nets Δ → one PerpEngine tx.  
-4. zkSNARK proves liquidation criteria without leaks.
+1. HPKE-encrypted commit signed with a burner wallet.  
+2. BatchBot forwards to **Poseidon**, which decrypts, verifies, and updates the Merkle tree.  
+3. Poseidon nets Δ and submits a single PerpEngine tx.  
+4. zkSNARK proof verified on-chain; no trade details leaked.
 
 ---
 
