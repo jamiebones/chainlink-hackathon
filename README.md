@@ -4,7 +4,9 @@
 > Mint sTSLA & sAAPL, provide USDC liquidity, and trade perps in **public** or **fully private** mode — powered by Chainlink CCIP, HPKE encryption, and zkSNARK-verified liquidations.
 
 ---
-
+## Deployments
+- Frontend- https://psix-v1.vercel.app/ 
+- Backend-  https://psix-backend.onrender.com
 ## 🚀 Overview
 psiX lets anyone:
 
