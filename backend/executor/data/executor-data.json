@@ -1,0 +1,20 @@
+{
+  "balances": {
+    "0x71c70066f9d1128126a1a5e36dee8faff4c55d30": {
+      "total": "998500000",
+      "available": "998500000",
+      "locked": "0",
+      "lastUpdate": 1751024225915
+    },
+    "0x072ecc90fa0ac2292e760a57304a87ad6c32bc89": {
+      "total": "4000000",
+      "available": "4000000",
+      "locked": "0",
+      "lastUpdate": 1751220992506
+    }
+  },
+  "positions": {},
+  "config": {
+    "lastBackup": 1751220992506
+  }
+}

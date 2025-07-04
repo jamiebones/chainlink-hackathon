@@ -6,8 +6,6 @@ import {FunctionsClient} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/Fu
 import {ConfirmedOwner} from "@chainlink/contracts/src/v0.8/shared/access/ConfirmedOwner.sol";
 import {FunctionsRequest} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/libraries/FunctionsRequest.sol";
 
-
-
 contract AAPLOracleManager is FunctionsClient, ConfirmedOwner {
     using FunctionsRequest for FunctionsRequest.Request;
 
@@ -25,42 +23,46 @@ contract AAPLOracleManager is FunctionsClient, ConfirmedOwner {
     uint256 public lastPrice;
     bool public circuitBreakerActive;
 
-   
+    //Avalanche Fuji Testnet
+    //router:  0xA9d587a00A31A52Ed70D6026794a8FC5E2F5dCb0;
+    //donID:  0x66756e2d6176616c616e6368652d66756a692d31000000000000000000000000;
 
-    // // Chainlink config (update for your network as needed)
-    // address constant router = 0x234a5fb5Bd614a7AA2FfAB244D603abFA0Ac5C5C;
-    // bytes32 constant donID = 0x66756e2d617262697472756d2d7365706f6c69612d3100000000000000000000;
-    // uint32 constant gasLimit = 300000;
-
-    address public immutable router;
-    bytes32 public immutable donID;
-    uint32  public immutable gasLimit;
+    //Arbritium Sepolia Testnet
+    //router: 0x234a5fb5Bd614a7AA2FfAB244D603abFA0Ac5C5C
+    //donID: 0x66756e2d617262697472756d2d7365706f6c69612d3100000000000000000000
+    // Chainlink config (update for your network as needed)
+    address private router;
+    bytes32 private donID;
+    uint32 constant gasLimit = 300000;
 
     string constant source =
-        "const apiKey = \"VQCHMJ6090ZBZRLX\";\n"
+        'const apiKey = "VQCHMJ6090ZBZRLX";\n'
         "const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=AAPL&apikey=${apiKey}`;\n"
         "const response = await Functions.makeHttpRequest({ url });\n"
-        "if (response.error) { throw Error(\"API request failed\") }\n"
-        "const data = response.data[\"Global Quote\"];\n"
-        "if (!data || !data[\"05. price\"]) { throw Error(\"Invalid API response\") }\n"
-        "const aaplPrice = parseFloat(data[\"05. price\"]);\n"
+        'if (response.error) { throw Error("API request failed") }\n'
+        'const data = response.data["Global Quote"];\n'
+        'if (!data || !data["05. price"]) { throw Error("Invalid API response") }\n'
+        'const aaplPrice = parseFloat(data["05. price"]);\n'
         "return Functions.encodeUint256(Math.round(aaplPrice * 100));";
 
-    event OracleUpdate(uint256 indexed price, uint256 indexed twap, bool circuitBreaker);
+    event OracleUpdate(
+        uint256 indexed price,
+        uint256 indexed twap,
+        bool circuitBreaker
+    );
 
-    constructor(uint256 _windowSize, address _router, bytes32 _donID, uint32 _gasLimit)
-        FunctionsClient(_router)
-        ConfirmedOwner(msg.sender)
-    {
+    constructor(
+        uint256 _windowSize,
+        address _router,
+        bytes32 _donID
+    ) FunctionsClient(_router) ConfirmedOwner(msg.sender) {
         require(_windowSize > 0 && _windowSize < 1000, "Invalid window size");
         windowSize = _windowSize;
         prices = new uint256[](_windowSize);
         pointer = 0;
         priceCount = 0;
-
         router = _router;
         donID = _donID;
-        gasLimit = _gasLimit;
     }
 
     // Allows owner to update window size (resets price history)
@@ -128,8 +130,7 @@ contract AAPLOracleManager is FunctionsClient, ConfirmedOwner {
         return circuitBreakerActive;
     }
 
-   
-    function getPriceAAPL() external view returns (uint256){
+    function getPriceAAPL() external view returns (uint256) {
         return lastPrice;
     }
 }

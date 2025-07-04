@@ -1,55 +1,52 @@
-// app/trade/page.tsx
 'use client'
-
-import React from 'react'
+import React, { useState } from 'react'
 import MarketChart from '../components/MarketChart'
 import TradeForm from '../components/TradeForm'
 import PositionTable from '../components/PositionTable'
+import { useRouter } from 'next/navigation'
 
 export default function TradePage() {
+  const [symbol, setSymbol] = useState<'TSLA' | 'APPL'>('TSLA')
+  const router = useRouter()
+  const handlePrivate = () => {
+    router.push('/private')
+  }
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#111112] relative overflow-hidden">
-      {/* Blurred colored balls for Uniswap-style background */}
-      <div className="absolute inset-0 pointer-events-none z-0">
-        <div className="absolute top-1/4 left-1/4 w-48 h-48 bg-pink-500 opacity-30 blur-3xl rounded-full" />
-        <div className="absolute top-2/3 left-2/3 w-40 h-40 bg-yellow-400 opacity-20 blur-3xl rounded-full" />
-        <div className="absolute top-1/2 left-1/2 w-32 h-32 bg-blue-400 opacity-20 blur-3xl rounded-full" />
-        <div className="absolute top-1/3 left-2/3 w-36 h-36 bg-green-400 opacity-20 blur-3xl rounded-full" />
+    <div className="min-h-screen relative bg-gradient-to-br from-black via-slate-950/80 to-gray-950 overflow-hidden font-sans flex items-center justify-center">
+      {/* Animated star field */}
+      <div className="absolute inset-0 z-0 pointer-events-none">
+        <div className="absolute -top-32 -left-40 w-[600px] h-[500px] bg-gradient-to-tr from-purple-500/30 via-blue-600/15 to-transparent rounded-full blur-3xl animate-pulse" />
+        <div className="absolute top-2/3 right-1/4 w-[450px] h-[380px] bg-gradient-to-br from-pink-500/25 via-purple-400/10 to-transparent rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute top-1/4 left-2/3 w-[350px] h-[280px] bg-gradient-to-tl from-cyan-400/20 via-blue-300/5 to-transparent rounded-full blur-2xl animate-pulse" style={{ animationDelay: '2s' }} />
+        <div className="absolute bottom-1/4 left-1/4 w-[300px] h-[250px] bg-gradient-to-tr from-emerald-400/15 via-teal-300/8 to-transparent rounded-full blur-2xl animate-pulse" style={{ animationDelay: '0.5s' }} />
       </div>
       <div className="relative z-10 w-full max-w-7xl mx-auto p-4 space-y-6">
         {/* Header */}
-        <div className="border-b border-white/10 bg-[#18181b]/80 backdrop-blur-md rounded-2xl shadow-lg">
+        <div className="glassy-card border-b border-white/10">
           <div className="max-w-7xl mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
-              <h1 className="text-2xl font-bold text-white">Trade</h1>
+              <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-purple-200 to-blue-200 tracking-tight">Trade</h1>
               <div className="flex items-center space-x-4">
                 <div className="flex items-center space-x-2 text-sm text-slate-300">
-                  <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                  <span>Arbitrum</span>
-                </div>
-                <div className="px-3 py-1 bg-slate-800 rounded-lg text-sm text-slate-300">
-                  TSLA: $185.25
+                  <button className="w-full py-2 px-4 rounded-xl font-bold bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 text-white shadow-lg hover:from-pink-500 hover:to-purple-500 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-400/40" onClick={handlePrivate}>Private Mode</button>
+                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                  <span className="text-white/80">Avalanche</span>
                 </div>
               </div>
             </div>
           </div>
         </div>
-
-        {/* Main Trading Grid */}
-        <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
-          {/* Chart Section */}
-          <div className="xl:col-span-3">
-            <MarketChart symbol="sTSLA" />
+        <div className="max-w-7xl mx-auto p-4 space-y-6">
+          <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+            <div className="xl:col-span-3">
+              <MarketChart symbol={symbol === 'TSLA' ? 'TSLA' : 'AAPL'} />
+            </div>
+            <div className="xl:col-span-1">
+              <TradeForm symbol={symbol} setSymbol={setSymbol} />
+            </div>
           </div>
-          
-          {/* Trade Form */}
-          <div className="xl:col-span-1">
-            <TradeForm />
-          </div>
+          <PositionTable />
         </div>
-        
-        {/* Positions Table */}
-        <PositionTable />
       </div>
     </div>
   )

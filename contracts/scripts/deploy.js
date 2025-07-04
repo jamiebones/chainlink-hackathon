@@ -1,10 +1,52 @@
 const { ethers } = require("hardhat");
 const fs = require("fs");
 const path = require("path");
+const { config } = require("dotenv");
 require("dotenv").config();
 
+const { router, donId, gasLimit } = network.config;
 
-// Color codes for console output
+const usdcAbi = [
+  "function name() view returns (string)",
+  "function symbol() view returns (string)",
+  "function decimals() view returns (uint8)",
+  "function balanceOf(address account) view returns (uint256)",
+  "function transfer(address to, uint256 amount) returns (bool)",
+  "function approve(address spender, uint256 amount) returns (bool)",
+  "function allowance(address owner, address spender) view returns (uint256)"
+];
+const sourceChainSelector = 16015286601757825753n
+const avalanceFujiRouterContractAddress = "0xF694E193200268f9a4868e4Aa017A0118C9a8177";
+const usdcAddressAvalancheFuji = "0x5425890298aed601595a70AB815c96711a31Bc65"
+
+const provider = new ethers.JsonRpcProvider(`https://avalanche-fuji.infura.io/v3/${process.env.INFURA_API_KEY}`);
+const usdcContract = new ethers.Contract(usdcAddressAvalancheFuji, usdcAbi, provider);
+
+const avalancheFujiRouter = "0xA9d587a00A31A52Ed70D6026794a8FC5E2F5dCb0";
+const avalancheFujiDonID = "0x66756e2d6176616c616e6368652d66756a692d31000000000000000000000000";
+
+;
+//router address on Avalanche Fuji: 0xf694e193200268f9a4868e4aa017a0118c9a8177
+// Deployment configuration
+const CONFIG = {
+  // Chainlink subscription IDs (update for your network)
+  chainlinkSubscriptionId: 15656, // Update with your subscription ID
+
+  // Initial liquidity amounts
+  initialLiquidityUSDC: ethers.parseUnits("10", 6), // 100000000000 USDC
+
+  // Team addresses
+  treasury: null, // Will use deployer if not set
+  teamMultisig: null, // Will use deployer if not set
+
+  // Oracle configuration
+  oracleWindowSize: 10, // 60 data points for TWAP
+
+  // Fee configuration
+  lpShare: 7000, // 70%
+  protocolShare: 3000, // 30%
+};
+
 const colors = {
   reset: "\x1b[0m",
   bright: "\x1b[1m",
@@ -14,156 +56,198 @@ const colors = {
   cyan: "\x1b[36m"
 };
 
-const { router, donId, gasLimit } = network.config;
-
-// Deployment configuration
-const CONFIG = {
-  // Chainlink subscription IDs (update for your network)
-  chainlinkSubscriptionId: 1, // Update with your subscription ID
-  
-  // Initial liquidity amounts
-  initialLiquidityUSDC: ethers.parseUnits("1000", 6), // 1000 USDC
-  
-  // Team addresses
-  treasury: null, // Will use deployer if not set
-  teamMultisig: null, // Will use deployer if not set
-  
-  // Oracle configuration
-  oracleWindowSize: 60, // 60 data points for TWAP
-  
-  // Fee configuration
-  lpShare: 7000, // 70%
-  protocolShare: 3000, // 30%
-};
+// Helper function to execute transactions with proper nonce management
+async function executeTransaction(txPromise, description, retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      console.log(`Executing ${description}... (attempt ${i + 1}/${retries})`);
+      
+      const tx = await txPromise;
+      console.log(`Transaction sent: ${tx.hash}`);
+      
+      const receipt = await tx.wait();
+      console.log(`✅ ${description} completed (Gas used: ${receipt.gasUsed})`);
+      
+      // Add small delay to prevent nonce issues
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      return receipt;
+      
+    } catch (error) {
+      console.error(`❌ Attempt ${i + 1} failed for ${description}: ${error.message}`);
+      
+      if (error.message.includes("nonce too low") || error.message.includes("nonce")) {
+        console.log("Nonce issue detected, waiting 5 seconds before retry...");
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
+      
+      if (i === retries - 1) throw error;
+      
+      console.log("Retrying in 3 seconds...");
+      await new Promise(resolve => setTimeout(resolve, 3000));
+    }
+  }
+}
 
 async function main() {
-  console.log(`${colors.cyan}🚀 Starting Synthetic Equity Protocol Deployment${colors.reset}\n`);
+  console.log("🚀 Starting Synthetic Equity Protocol Deployment\n");
 
   if (!process.env.LP_PROVIDER_PRIVATE_KEY || !process.env.FEE_RECEIVER_PRIVATE_KEY) {
-    console.warn(`${colors.red}⚠️  One or more private keys are missing in .env — falling back to DEPLOYER key${colors.reset}`);
+    console.warn("⚠️  One or more private keys are missing in .env — falling back to DEPLOYER key");
   }
 
   const deployer = new ethers.Wallet(process.env.DEPLOYER_PRIVATE_KEY, ethers.provider);
   const lpProvider = new ethers.Wallet(process.env.LP_PROVIDER_PRIVATE_KEY || process.env.DEPLOYER_PRIVATE_KEY, ethers.provider);
   const feeReceiver = new ethers.Wallet(process.env.FEE_RECEIVER_PRIVATE_KEY || process.env.DEPLOYER_PRIVATE_KEY, ethers.provider);
+  const executor = new ethers.Wallet(process.env.DEPLOYER_PRIVATE_KEY, ethers.provider);
 
-  console.log(`${colors.yellow}📍 Network: ${network.name}${colors.reset}`);
-
-  console.log(`${colors.yellow}📍 Deployer address: ${deployer.address}${colors.reset}`);
-  console.log(`${colors.yellow}📍 LP Provider address: ${lpProvider.address}${colors.reset}`);
-  console.log(`${colors.yellow}📍 Fee Receiver address: ${feeReceiver.address}${colors.reset}\n`);
+  console.log(`Network: ${network.name}`);
+  console.log(`Deployer address: ${deployer.address}`);
+  console.log(`LP Provider address: ${lpProvider.address}`);
+  console.log(`Fee Receiver address: ${feeReceiver.address}\n`);
 
   // Check deployer balance
   const balance = await ethers.provider.getBalance(deployer.address);
-  console.log(`${colors.yellow}💰 Deployer balance: ${ethers.formatEther(balance)} ETH${colors.reset}\n`);
+  console.log(`Deployer balance: ${ethers.formatEther(balance)} ETH\n`);
 
-  // Object to store all deployed addresses
   const deployments = {};
 
   try {
-    // ========================================
-    // 1. Deploy Mock USDC (for testnet)
-    // ========================================
-    console.log(`${colors.bright}1. Deploying USDC...${colors.reset}`);
-    const MockUSDC = await ethers.getContractFactory("MockERC20");
-    const usdc = await MockUSDC.deploy("USD Coin", "USDC", 6);
-    await usdc.waitForDeployment();
-    deployments.usdc = await usdc.getAddress();
-    console.log(`${colors.green}✅ USDC deployed at: ${deployments.usdc}${colors.reset}\n`);
-
-    // Mint USDC for testing
-    console.log(`${colors.yellow}💵 Minting USDC for testing...${colors.reset}`);
-    await usdc.mint(deployer.address, ethers.parseUnits("10000000", 6)); // 10M to deployer
-    await usdc.mint(lpProvider.address, ethers.parseUnits("2000000", 6)); // 2M to LP provider
-    console.log(`${colors.green}✅ USDC minted${colors.reset}\n`);
 
     // ========================================
-    // 2. Deploy Oracle Infrastructure
+    // 1. Deploy Oracle Infrastructure
     // ========================================
     console.log(`${colors.bright}2. Deploying Oracle Infrastructure...${colors.reset}`);
 
     // Deploy MarketStatusOracle
-    const MarketStatusOracle = await ethers.getContractFactory("MarketStatusOracle");
-    const marketStatusOracle = await MarketStatusOracle.deploy();
-    await marketStatusOracle.waitForDeployment();
-    deployments.marketStatusOracle = await marketStatusOracle.getAddress();
-    console.log(`${colors.green}✅ MarketStatusOracle deployed at: ${deployments.marketStatusOracle}${colors.reset}`);
+    // const MarketStatusOracle = await ethers.getContractFactory("MarketStatusOracle");
+    // const marketStatusOracle = await MarketStatusOracle.deploy(
+    //   avalancheFujiRouter,
+    //   avalancheFujiDonID,
+    // );
+    // await marketStatusOracle.waitForDeployment();
+    // deployments.marketStatusOracle = await marketStatusOracle.getAddress();
+    // console.log(`✅ MarketStatusOracle deployed at: ${deployments.marketStatusOracle}`);
 
     // Deploy TSLAOracleManager
-    const TSLAOracleManager = await ethers.getContractFactory("TSLAOracleManager");
-
-    const tslaOracle = await TSLAOracleManager.deploy(
-        CONFIG.oracleWindowSize,
-        deployments.marketStatusOracle,
-        router,
-        donId,
-        gasLimit
-    );
-    await tslaOracle.waitForDeployment();
-    deployments.tslaOracle = await tslaOracle.getAddress();
-    console.log(`${colors.green}✅ TSLAOracleManager deployed at: ${deployments.tslaOracle}${colors.reset}`);
+    // const TSLAOracleManager = await ethers.getContractFactory("TSLAOracleManager");
+    // const tslaOracle = await TSLAOracleManager.deploy(
+    //   CONFIG.oracleWindowSize,
+    //   deployments.marketStatusOracle,
+    //   avalancheFujiRouter,
+    //   avalancheFujiDonID,
+    // );
+    // await tslaOracle.waitForDeployment();
+    // deployments.tslaOracle = await tslaOracle.getAddress();
+    // console.log(`✅ TSLAOracleManager deployed at: ${deployments.tslaOracle}`);
 
     // Deploy AAPLOracleManager
-    const AAPLOracleManager = await ethers.getContractFactory("AAPLOracleManager");
-    const aaplOracle = await AAPLOracleManager.deploy(
-        CONFIG.oracleWindowSize,
-        router,
-        donId,
-        gasLimit
-    );
-    await aaplOracle.waitForDeployment();
-    deployments.aaplOracle = await aaplOracle.getAddress();
-    console.log(`${colors.green}✅ AAPLOracleManager deployed at: ${deployments.aaplOracle}${colors.reset}`);
+    // const AAPLOracleManager = await ethers.getContractFactory("AAPLOracleManager");
+    // const aaplOracle = await AAPLOracleManager.deploy(
+    //   CONFIG.oracleWindowSize,
+    //   avalancheFujiRouter,
+    //   avalancheFujiDonID,
+    // );
+    // await aaplOracle.waitForDeployment();
+    // deployments.aaplOracle = await aaplOracle.getAddress();
+    // console.log(`✅ AAPLOracleManager deployed at: ${deployments.aaplOracle}`);
+
+    //Deploy the Utils library;
+    const Utils = await ethers.getContractFactory("Utils");
+    const utils = await Utils.deploy();
+    await utils.waitForDeployment();
+    const utilsAddress = await utils.getAddress();
 
     // Deploy ChainlinkManager
-    const ChainlinkManager = await ethers.getContractFactory("ChainlinkManager");
-    const chainlinkManager = await ChainlinkManager.deploy(
-      deployments.tslaOracle,
-      deployments.aaplOracle,
-      deployments.marketStatusOracle
-    );
-    await chainlinkManager.waitForDeployment();
-    deployments.chainlinkManager = await chainlinkManager.getAddress();
-    console.log(`${colors.green}✅ ChainlinkManager deployed at: ${deployments.chainlinkManager}${colors.reset}\n`);
+    //const ChainlinkManager = await ethers.getContractFactory("ChainlinkManager");
+
+    // const ChainlinkManager = await ethers.getContractFactory("ChainlinkManager", {
+    //   libraries: {
+    //     "lib/Utils.sol:Utils": utilsAddress,
+    //   },
+    // });
+    // const chainlinkManager = await ChainlinkManager.deploy(
+    //   deployments.tslaOracle,
+    //   deployments.aaplOracle,
+    //   deployments.marketStatusOracle
+    // );
+    // await chainlinkManager.waitForDeployment();
+    // deployments.chainlinkManager = await chainlinkManager.getAddress();
+    // console.log(`✅ ChainlinkManager deployed at: ${deployments.chainlinkManager}\n`);
+
 
     // ========================================
-    // 3. Deploy Core Protocol Contracts
+    // 2. Deploy Core Protocol Contracts
     // ========================================
     console.log(`${colors.bright}3. Deploying Core Protocol Contracts...${colors.reset}`);
 
     // Deploy LiquidityPool
     const LiquidityPool = await ethers.getContractFactory("LiquidityPool");
-    const liquidityPool = await LiquidityPool.deploy(deployments.usdc);
+    const liquidityPool = await LiquidityPool.deploy(usdcAddressAvalancheFuji);
     await liquidityPool.waitForDeployment();
     deployments.liquidityPool = await liquidityPool.getAddress();
-    console.log(`${colors.green}✅ LiquidityPool deployed at: ${deployments.liquidityPool}${colors.reset}`);
+    console.log(`✅ LiquidityPool deployed at: ${deployments.liquidityPool}`);
 
     // Deploy Vault (without feeReceiver in constructor - will set later)
-    const Vault = await ethers.getContractFactory("Vault");
+    const Vault = await ethers.getContractFactory("Vault", {
+      libraries: {
+        "lib/Utils.sol:Utils": utilsAddress,
+      },
+    });
     const vault = await Vault.deploy(
-      deployments.usdc,
+      usdcAddressAvalancheFuji,
       deployer.address,
-      deployments.chainlinkManager
+      "0xf0371d57b1fb08Deaf1F3AbE37c1465dC4025c45"
+      //deployments.chainlinkManager
     );
     await vault.waitForDeployment();
     deployments.vault = await vault.getAddress();
-    console.log(`${colors.green}✅ Vault deployed at: ${deployments.vault}${colors.reset}`);
+    console.log(`✅ Vault deployed at: ${deployments.vault}`);
+
+    // Deploy ChainlinkManager
+    const ReceiverContract = await ethers.getContractFactory("ReceiverContract");
+    const receiverContract = await ReceiverContract.deploy(
+      avalanceFujiRouterContractAddress,
+      usdcAddressAvalancheFuji,
+      deployments.vault,
+      "0xf0371d57b1fb08Deaf1F3AbE37c1465dC4025c45"
+      //deployments.chainlinkManager
+    );
+
+    await receiverContract.waitForDeployment();
+    deployments.receiverContract = await receiverContract.getAddress();
+    console.log(`${colors.green}✅ ReceiverContract deployed at: ${deployments.receiverContract}${colors.reset}\n`);
+
 
     // Deploy PerpEngine
     const PerpEngine = await ethers.getContractFactory("PerpEngine");
     const perpEngine = await PerpEngine.deploy(
-      deployments.usdc,
-      deployments.liquidityPool,
-      deployments.chainlinkManager,
+      usdcAddressAvalancheFuji,
+       deployments.liquidityPool,
+      //deployments.chainlinkManager,
+      "0xf0371d57b1fb08Deaf1F3AbE37c1465dC4025c45",
       deployments.vault,
-      feeReceiver.address
+      feeReceiver.address,
+      executor.address
     );
     await perpEngine.waitForDeployment();
     deployments.perpEngine = await perpEngine.getAddress();
-    console.log(`${colors.green}✅ PerpEngine deployed at: ${deployments.perpEngine}${colors.reset}\n`);
+    console.log(`✅ PerpEngine deployed at: ${deployments.perpEngine}`);
+
+    const PerpEngineZk = await ethers.getContractFactory("PerpEngineZk");
+    const perpEngineZk = await PerpEngineZk.deploy(
+      deployer.address,  // needs to be updated to verifier
+      deployments.perpEngine,
+      usdcAddressAvalancheFuji
+      //usdc.getAddress()
+    );
+    await perpEngineZk.waitForDeployment();
+    deployments.perpEngineZk = await perpEngineZk.getAddress();
+
+    console.log(`✅ PerpEngineZk deployed at: ${deployments.perpEngineZk}\n`);
 
     // ========================================
-    // 4. Deploy Synthetic Assets
+    // 3. Deploy Synthetic Assets
     // ========================================
     console.log(`${colors.bright}4. Deploying Synthetic Assets...${colors.reset}`);
 
@@ -172,28 +256,33 @@ async function main() {
     const sTSLA = await STSLA.deploy();
     await sTSLA.waitForDeployment();
     deployments.sTSLA = await sTSLA.getAddress();
-    console.log(`${colors.green}✅ sTSLA deployed at: ${deployments.sTSLA}${colors.reset}`);
+    console.log(`✅ sTSLA deployed at: ${deployments.sTSLA}`);
 
     // Deploy sAPPL
     const SAPPL = await ethers.getContractFactory("sAPPL");
     const sAPPL = await SAPPL.deploy();
     await sAPPL.waitForDeployment();
     deployments.sAPPL = await sAPPL.getAddress();
-    console.log(`${colors.green}✅ sAPPL deployed at: ${deployments.sAPPL}${colors.reset}\n`);
+    console.log(`✅ sAPPL deployed at: ${deployments.sAPPL}\n`);
 
     console.log(`${colors.bright}4.5. Verifying Contract Deployments...${colors.reset}`);
-    
+
     // Verify all contracts are properly deployed
     const contracts = {
-      'USDC': deployments.usdc,
-      'LiquidityPool': deployments.liquidityPool,
+      //'LiquidityPool': deployments.liquidityPool,
       'Vault': deployments.vault,
       'PerpEngine': deployments.perpEngine,
+      'PerpEngineZk': deployments.perpEngineZk,
       'sTSLA': deployments.sTSLA,
       'sAPPL': deployments.sAPPL,
-      'ChainlinkManager': deployments.chainlinkManager
+      //'ChainlinkManager': deployments.chainlinkManager,
+      "ReceiverContract": deployments.receiverContract,
+      "marketStatusOracle": "0xD1690b54a55A58df4440EE56969E3420198747D1",
+      "tslaOracle": "0x70671A042B419B266d36212337eEC2A715Af603c",
+      "aaplOracle": "0x76e6bf0aE87215ac57fE7ba900fD59Bab5C94eED",
+      "chainlinkManager": "0xf0371d57b1fb08Deaf1F3AbE37c1465dC4025c45"
     };
-    
+
     for (const [name, address] of Object.entries(contracts)) {
       const code = await ethers.provider.getCode(address);
       if (code === '0x') {
@@ -201,75 +290,85 @@ async function main() {
       }
       console.log(`✅ ${name}: ${address} (deployed)`);
     }
+
+    //start the subscription;
+
+
     
+
     // Test contract interactions
     console.log("\nTesting basic contract calls...");
-    
+
     try {
-      // Test LiquidityPool methods exist
       const liquidityPoolContract = await ethers.getContractAt("LiquidityPool", deployments.liquidityPool);
       console.log("LiquidityPool contract instance created");
-      
+
       // Test if the methods exist
       const usdcAddress = await liquidityPoolContract.usdc();
       console.log(`LiquidityPool.usdc(): ${usdcAddress}`);
-      
+
       const totalLiq = await liquidityPoolContract.totalLiquidity();
       console.log(`LiquidityPool.totalLiquidity(): ${totalLiq}`);
-      
+
     } catch (testError) {
-      console.log(`${colors.red}❌ Contract interaction test failed:${colors.reset}`, testError);
+      console.log("❌ Contract interaction test failed:", testError);
       throw testError;
     }
-    
+
     console.log(`${colors.green}✅ All contracts verified and functional${colors.reset}\n`);
 
     // ========================================
-    // 5. Configure Permissions and Links
+    // 4. Configure Permissions and Links
     // ========================================
     console.log(`${colors.bright}5. Configuring Permissions...${colors.reset}`);
 
     // Set Vault address in synthetic tokens
     console.log("Setting vault permissions for synthetic tokens...");
-    await sTSLA.setVault(deployments.vault);
-    await sAPPL.setVault(deployments.vault);
-    console.log(`${colors.green}✅ Synthetic tokens configured${colors.reset}`);
+    await executeTransaction(
+      sTSLA.setVault(deployments.vault),
+      "sTSLA setVault"
+    );
+    await executeTransaction(
+      sAPPL.setVault(deployments.vault),
+      "sAPPL setVault"
+    );
+    console.log("✅ Synthetic tokens configured");
 
-    // Configure LiquidityPool with detailed debugging
+    // Configure LiquidityPool
     console.log("Configuring LiquidityPool...");
     console.log(`About to set perpMarket to: ${deployments.perpEngine}`);
     console.log(`About to set vault to: ${deployments.vault}`);
-    
+
     // Check LiquidityPool before configuration
     let perpMarketBefore = await liquidityPool.perpMarket();
     let vaultBefore = await liquidityPool.vault();
     console.log(`LiquidityPool perpMarket BEFORE: ${perpMarketBefore}`);
     console.log(`LiquidityPool vault BEFORE: ${vaultBefore}`);
-    
+
     try {
       // Set perpMarket
       console.log("Setting perpMarket...");
       const setPerpTx = await liquidityPool.setPerpMarket(deployments.perpEngine);
       await setPerpTx.wait();
       console.log("setPerpMarket transaction completed");
-      
+
       // Set vault
       console.log("Setting vault...");
       const setVaultTx = await liquidityPool.setVault(deployments.vault);
       await setVaultTx.wait();
       console.log("setVault transaction completed");
-      
+
     } catch (configError) {
-      console.log(`${colors.red}❌ Configuration failed:${colors.reset}`, configError);
+      console.log("❌ Configuration failed:", configError);
       throw configError;
     }
-    
+
     // Check LiquidityPool after configuration
     let perpMarketAfter = await liquidityPool.perpMarket();
     let vaultAfter = await liquidityPool.vault();
     console.log(`LiquidityPool perpMarket AFTER: ${perpMarketAfter}`);
     console.log(`LiquidityPool vault AFTER: ${vaultAfter}`);
-    
+
     // Verify the values were actually set
     if (perpMarketAfter === ethers.ZeroAddress) {
       throw new Error("setPerpMarket failed - still zero address");
@@ -277,44 +376,51 @@ async function main() {
     if (vaultAfter === ethers.ZeroAddress) {
       throw new Error("setVault failed - still zero address");
     }
-    
+
     console.log(`${colors.green}✅ LiquidityPool configured successfully${colors.reset}`);
 
     // Configure Vault
     console.log("Configuring Vault...");
+    let tx;
     try {
-      await vault.setFeeReceiver(feeReceiver.address);
+      tx = await vault.setFeeReceiver(feeReceiver.address);
+      await tx.wait(1);
       console.log("setFeeReceiver completed");
-      
-      await vault.setPerpEngine(deployments.perpEngine);
+
+      tx = await vault.setPerpEngine(deployments.perpEngine);
+      await tx.wait(1);
       console.log("setPerpEngine completed");
-      
-      await vault.startUpProtocol(
+
+      tx = await vault.startUpProtocol(
         deployments.sTSLA,
         deployments.sAPPL,
         deployments.perpEngine
       );
+      await tx.wait(1);
       console.log("startUpProtocol completed");
-      
+
     } catch (vaultError) {
-      console.log(`${colors.red}❌ Vault configuration failed:${colors.reset}`, vaultError);
+      console.log("❌ Vault configuration failed:", vaultError);
       throw vaultError;
     }
-    console.log(`${colors.green}✅ Vault configured${colors.reset}`);
+    console.log("✅ Vault configured");
 
     // Configure PerpEngine
     console.log("Configuring PerpEngine...");
     try {
-      await perpEngine.setVaultAddress(deployments.vault);
+      tx = await perpEngine.setVaultAddress(deployments.vault);
+      await tx.wait();
       console.log("setVaultAddress completed");
+      await perpEngine.setPerpEngineZk(deployments.perpEngineZk);
+      console.log("setPerpEngineZk completed");
     } catch (perpError) {
-      console.log(`${colors.red}❌ PerpEngine configuration failed:${colors.reset}`, perpError);
+      console.log("❌ PerpEngine configuration failed:", perpError);
       throw perpError;
     }
     console.log(`${colors.green}✅ PerpEngine configured${colors.reset}\n`);
-    
+
     // ========================================
-    // 6. Initialize Liquidity Pool
+    // 5. Initialize Liquidity Pool
     // ========================================
     console.log(`${colors.bright}6. Initializing Liquidity Pool...${colors.reset}`);
 
@@ -323,7 +429,7 @@ async function main() {
     const vaultAddress = await liquidityPool.vault();
     console.log(`LiquidityPool perpMarket: ${perpMarketAddress}`);
     console.log(`LiquidityPool vault: ${vaultAddress}`);
-
+    
     // Verify configuration is correct
     if (perpMarketAddress === ethers.ZeroAddress) {
       throw new Error("LiquidityPool perpMarket not set");
@@ -333,26 +439,28 @@ async function main() {
     }
 
     // Check LP Provider balance
-    const lpBalance = await usdc.balanceOf(lpProvider.address);
+    const lpBalance = await usdcContract.balanceOf(lpProvider.address);
     console.log(`LP Provider USDC balance: ${ethers.formatUnits(lpBalance, 6)} USDC`);
     console.log(`Amount to deposit: ${ethers.formatUnits(CONFIG.initialLiquidityUSDC, 6)} USDC`);
-
+    
     if (lpBalance < CONFIG.initialLiquidityUSDC) {
       throw new Error("Insufficient USDC balance for LP provider");
     }
 
     // Approve USDC spending
     console.log("Approving USDC...");
-    const approvalTx = await usdc.connect(lpProvider).approve(
+    const approvalTx = await usdcContract.connect(lpProvider).approve(
       deployments.liquidityPool,
-      CONFIG.initialLiquidityUSDC
+      ethers.parseUnits("10000000000000000", 6)
+      //CONFIG.initialLiquidityUSDC
     );
+
     await approvalTx.wait();
 
     // Verify approval
-    const allowance = await usdc.allowance(lpProvider.address, deployments.liquidityPool);
+    const allowance = await usdcContract.allowance(lpProvider.address, deployments.liquidityPool);
     console.log(`Verified allowance: ${ethers.formatUnits(allowance, 6)} USDC`);
-
+    
     if (allowance < CONFIG.initialLiquidityUSDC) {
       throw new Error(`Insufficient allowance: ${ethers.formatUnits(allowance, 6)} < ${ethers.formatUnits(CONFIG.initialLiquidityUSDC, 6)}`);
     }
@@ -360,13 +468,14 @@ async function main() {
     // Now attempt the deposit
     console.log("Attempting deposit...");
     try {
-      const depositTx = await liquidityPool.connect(lpProvider).deposit(CONFIG.initialLiquidityUSDC);
-      await depositTx.wait();
-      console.log(`${colors.green}✅ Successfully deposited ${ethers.formatUnits(CONFIG.initialLiquidityUSDC, 6)} USDC${colors.reset}\n`);
+      await executeTransaction(
+        liquidityPool.connect(lpProvider).deposit(CONFIG.initialLiquidityUSDC),
+        "Initial liquidity deposit"
+      );
+      console.log(`✅ Successfully deposited ${ethers.formatUnits(CONFIG.initialLiquidityUSDC, 6)} USDC\n`);
     } catch (error) {
-      console.log(`${colors.red}❌ Deposit failed${colors.reset}`);
+      console.log("❌ Deposit failed");
       console.log("Error:", error.message);
-      
       // Try static call for better error info
       try {
         await liquidityPool.connect(lpProvider).deposit.staticCall(CONFIG.initialLiquidityUSDC);
@@ -377,42 +486,39 @@ async function main() {
     }
 
     // ========================================
-    // 7. Initialize Oracle Prices (Mock for testing)
+    // 6. Initialize Oracle Prices (Mock for testing)
     // ========================================
     console.log(`${colors.bright}7. Setting Initial Oracle Prices (Mock)...${colors.reset}`);
-    
+
     // For mainnet, you'd trigger actual oracle updates
     // For testing, we'll use mock prices if available
     if (process.env.NETWORK === "localhost" || process.env.NETWORK === "hardhat") {
-      console.log(`${colors.yellow}⚠️  Using mock prices for testing${colors.reset}`);
-      // If you have mock oracle contracts, set prices here
-      // await mockChainlinkManager.setPrice(0, ethers.parseUnits("450", 18)); // TSLA
-      // await mockChainlinkManager.setPrice(1, ethers.parseUnits("175", 18)); // AAPL
+      console.log("⚠️  Using mock prices for testing");
     } else {
-      console.log(`${colors.yellow}⚠️  Remember to trigger oracle updates with Chainlink subscription${colors.reset}`);
+      console.log("⚠️  Remember to trigger oracle updates with Chainlink subscription");
     }
 
     // ========================================
-    // 8. Verify Configuration
+    // 7. Verify Configuration
     // ========================================
     console.log(`\n${colors.bright}8. Verifying Deployment...${colors.reset}`);
-    
+
     // Check LiquidityPool state
     const totalLiquidity = await liquidityPool.totalLiquidity();
     const availableLiquidity = await liquidityPool.availableLiquidity();
     console.log(`LiquidityPool - Total: ${ethers.formatUnits(totalLiquidity, 6)} USDC`);
     console.log(`LiquidityPool - Available: ${ethers.formatUnits(availableLiquidity, 6)} USDC`);
-    
+
     // Check Vault configuration
     const vaultContract = await ethers.getContractAt("Vault", deployments.vault);
     const isStarted = await vaultContract.isStarted();
     console.log(`Vault - Started: ${isStarted}`);
-    
+
     // ========================================
-    // 9. Save Deployment Addresses
+    // 8. Save Deployment Addresses
     // ========================================
     console.log(`\n${colors.bright}9. Saving Deployment Info...${colors.reset}`);
-    
+
     const deploymentInfo = {
       network: network.name,
       chainId: network.config.chainId,
@@ -430,29 +536,29 @@ async function main() {
     const deploymentPath = path.join(__dirname, `../deployments/${network.name}_deployment.json`);
     fs.mkdirSync(path.dirname(deploymentPath), { recursive: true });
     fs.writeFileSync(deploymentPath, JSON.stringify(deploymentInfo, null, 2));
-    
+
     console.log(`${colors.green}✅ Deployment info saved to: ${deploymentPath}${colors.reset}`);
 
-    // ========================================
     // 10. Summary
     // ========================================
     console.log(`\n${colors.cyan}${'='.repeat(50)}${colors.reset}`);
     console.log(`${colors.bright}DEPLOYMENT SUCCESSFUL!${colors.reset}`);
     console.log(`${colors.cyan}${'='.repeat(50)}${colors.reset}\n`);
-    
+
     console.log(`${colors.bright}Key Addresses:${colors.reset}`);
-    console.log(`USDC: ${deployments.usdc}`);
     console.log(`LiquidityPool: ${deployments.liquidityPool}`);
     console.log(`Vault: ${deployments.vault}`);
     console.log(`PerpEngine: ${deployments.perpEngine}`);
+    console.log(`PerpEngineZk: ${deployments.perpEngineZk}`);
     console.log(`sTSLA: ${deployments.sTSLA}`);
     console.log(`sAPPL: ${deployments.sAPPL}`);
-    console.log(`ChainlinkManager: ${deployments.chainlinkManager}`);
+    //console.log(`ChainlinkManager: ${deployments.chainlinkManager}`);
+    console.log(`Receiver Contract: ${deployments.receiverContract}`);
 
     return deployments;
 
   } catch (error) {
-    console.error(`\n${colors.red}❌ Deployment failed:${colors.reset}`, error);
+    console.error("\n❌ Deployment failed:", error);
     process.exit(1);
   }
 }

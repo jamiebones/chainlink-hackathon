@@ -1,0 +1,1803 @@
+[
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "_collateral",
+                "type": "address"
+            },
+            {
+                "internalType": "address",
+                "name": "_pool",
+                "type": "address"
+            },
+            {
+                "internalType": "address",
+                "name": "_chainlinkManager",
+                "type": "address"
+            },
+            {
+                "internalType": "address",
+                "name": "_vaultAddress",
+                "type": "address"
+            },
+            {
+                "internalType": "address",
+                "name": "_feeReceiver",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "constructor"
+    },
+    {
+        "inputs": [],
+        "name": "AlreadyOpen",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "EmptyPool",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "ExceedsUtilization",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "FeeIsGreaterThanCollateral",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "InvalidPosition",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "InvalidSizeToReduce",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "MarketPaused",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "NoPosition",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "NotLiquidatable",
+        "type": "error"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "owner",
+                "type": "address"
+            }
+        ],
+        "name": "OwnableInvalidOwner",
+        "type": "error"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "account",
+                "type": "address"
+            }
+        ],
+        "name": "OwnableUnauthorizedAccount",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "PositionUnderCollateralized",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "ReentrancyGuardReentrantCall",
+        "type": "error"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "token",
+                "type": "address"
+            }
+        ],
+        "name": "SafeERC20FailedOperation",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "ZeroAmount",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "invalidPrice",
+        "type": "error"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "user",
+                "type": "address"
+            },
+            {
+                "indexed": false,
+                "internalType": "enum Utils.Asset",
+                "name": "asset",
+                "type": "uint8"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "newCollateral",
+                "type": "uint256"
+            }
+        ],
+        "name": "CollateralAdded",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "user",
+                "type": "address"
+            },
+            {
+                "indexed": true,
+                "internalType": "enum Utils.Asset",
+                "name": "asset",
+                "type": "uint8"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "amount",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "remainingCollateral",
+                "type": "uint256"
+            }
+        ],
+        "name": "CollateralWithdrawn",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "newSensitivity",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "newMinCR",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "newMaxUtil",
+                "type": "uint256"
+            }
+        ],
+        "name": "ConfigUpdated",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "openFee",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "closeFee",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "liquidationFee",
+                "type": "uint256"
+            }
+        ],
+        "name": "FeeUpdated",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "enum Utils.Asset",
+                "name": "asset",
+                "type": "uint8"
+            },
+            {
+                "indexed": false,
+                "internalType": "int256",
+                "name": "hourlyFundingRate",
+                "type": "int256"
+            },
+            {
+                "indexed": false,
+                "internalType": "int256",
+                "name": "newCumulativeFundingRate",
+                "type": "int256"
+            }
+        ],
+        "name": "FundingUpdated",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "previousOwner",
+                "type": "address"
+            },
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "newOwner",
+                "type": "address"
+            }
+        ],
+        "name": "OwnershipTransferred",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "user",
+                "type": "address"
+            },
+            {
+                "indexed": false,
+                "internalType": "enum Utils.Asset",
+                "name": "asset",
+                "type": "uint8"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "sizeUsd",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "netReturn",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "int256",
+                "name": "pnl",
+                "type": "int256"
+            }
+        ],
+        "name": "PositionClosed",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "user",
+                "type": "address"
+            },
+            {
+                "indexed": false,
+                "internalType": "enum Utils.Asset",
+                "name": "asset",
+                "type": "uint8"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "positionSize",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "penalty",
+                "type": "uint256"
+            }
+        ],
+        "name": "PositionLiquidated",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": false,
+                "internalType": "address",
+                "name": "trader",
+                "type": "address"
+            },
+            {
+                "indexed": false,
+                "internalType": "enum Utils.Asset",
+                "name": "asset",
+                "type": "uint8"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "sizeUsd",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "collateralAmount",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "price",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "bool",
+                "name": "isLong",
+                "type": "bool"
+            }
+        ],
+        "name": "PositionOpened",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "user",
+                "type": "address"
+            },
+            {
+                "indexed": false,
+                "internalType": "enum Utils.Asset",
+                "name": "asset",
+                "type": "uint8"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "reducedSizeUsd",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "remainingSizeUsd",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "int256",
+                "name": "pnl",
+                "type": "int256"
+            }
+        ],
+        "name": "PositionReduced",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": false,
+                "internalType": "uint8[]",
+                "name": "assetIds",
+                "type": "uint8[]"
+            },
+            {
+                "indexed": false,
+                "internalType": "int256[]",
+                "name": "netDeltas",
+                "type": "int256[]"
+            }
+        ],
+        "name": "PrivateBatchProcessed",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "user",
+                "type": "address"
+            },
+            {
+                "indexed": false,
+                "internalType": "enum Utils.Asset",
+                "name": "asset",
+                "type": "uint8"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "newSizeUsd",
+                "type": "uint256"
+            }
+        ],
+        "name": "SizeIncreased",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": false,
+                "internalType": "address",
+                "name": "newVault",
+                "type": "address"
+            }
+        ],
+        "name": "VaultAddressUpdated",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "user",
+                "type": "address"
+            },
+            {
+                "indexed": true,
+                "internalType": "enum Utils.Asset",
+                "name": "asset",
+                "type": "uint8"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "amount",
+                "type": "uint256"
+            }
+        ],
+        "name": "VaultHedgeClosed",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "vault",
+                "type": "address"
+            },
+            {
+                "indexed": false,
+                "internalType": "enum Utils.Asset",
+                "name": "asset",
+                "type": "uint8"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "additionalAmount",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "newSize",
+                "type": "uint256"
+            }
+        ],
+        "name": "VaultHedgeIncreased",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "user",
+                "type": "address"
+            },
+            {
+                "indexed": false,
+                "internalType": "enum Utils.Asset",
+                "name": "asset",
+                "type": "uint8"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "amount",
+                "type": "uint256"
+            }
+        ],
+        "name": "VaultHedgeOpened",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "vault",
+                "type": "address"
+            },
+            {
+                "indexed": false,
+                "internalType": "enum Utils.Asset",
+                "name": "asset",
+                "type": "uint8"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "closeAmount",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "actualReturn",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "int256",
+                "name": "pnl",
+                "type": "int256"
+            }
+        ],
+        "name": "VaultHedgePartialClose",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "trader",
+                "type": "address"
+            },
+            {
+                "indexed": true,
+                "internalType": "uint8",
+                "name": "assetId",
+                "type": "uint8"
+            }
+        ],
+        "name": "ZKLiquidationExecuted",
+        "type": "event"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "enum Utils.Asset",
+                "name": "asset",
+                "type": "uint8"
+            },
+            {
+                "internalType": "uint256",
+                "name": "addedCollateral",
+                "type": "uint256"
+            }
+        ],
+        "name": "addCollateral",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "uint256",
+                "name": "feeAmount",
+                "type": "uint256"
+            }
+        ],
+        "name": "addFeesToPool",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "uint8",
+                "name": "assetId",
+                "type": "uint8"
+            },
+            {
+                "internalType": "int256",
+                "name": "qtyDelta",
+                "type": "int256"
+            },
+            {
+                "internalType": "int256",
+                "name": "marginDelta",
+                "type": "int256"
+            }
+        ],
+        "name": "applyNetDelta",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "borrowingRateAnnualBps",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "chainlinkManager",
+        "outputs": [
+            {
+                "internalType": "contract IChainLinkManager",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "enum Utils.Asset",
+                "name": "asset",
+                "type": "uint8"
+            }
+        ],
+        "name": "closePosition",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "enum Utils.Asset",
+                "name": "asset",
+                "type": "uint8"
+            },
+            {
+                "internalType": "uint256",
+                "name": "redeemAmount",
+                "type": "uint256"
+            }
+        ],
+        "name": "closeVaultHedge",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "actualReturn",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "closeFeeBps",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "collateralToken",
+        "outputs": [
+            {
+                "internalType": "contract IERC20",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "enum Utils.Asset",
+                "name": "",
+                "type": "uint8"
+            }
+        ],
+        "name": "cumulativeFundingRate",
+        "outputs": [
+            {
+                "internalType": "int256",
+                "name": "",
+                "type": "int256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "enum Utils.Asset",
+                "name": "asset",
+                "type": "uint8"
+            }
+        ],
+        "name": "emergencyCloseVaultHedge",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "actualReturn",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "executor",
+        "outputs": [
+            {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "feeReceiver",
+        "outputs": [
+            {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "fundingRateSensitivity",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "user",
+                "type": "address"
+            },
+            {
+                "internalType": "enum Utils.Asset",
+                "name": "asset",
+                "type": "uint8"
+            }
+        ],
+        "name": "getCollateralRatio",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "enum Utils.Asset",
+                "name": "asset",
+                "type": "uint8"
+            }
+        ],
+        "name": "getFundingRate",
+        "outputs": [
+            {
+                "internalType": "int256",
+                "name": "",
+                "type": "int256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "user",
+                "type": "address"
+            },
+            {
+                "internalType": "enum Utils.Asset",
+                "name": "asset",
+                "type": "uint8"
+            }
+        ],
+        "name": "getLeverage",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "user",
+                "type": "address"
+            },
+            {
+                "internalType": "enum Utils.Asset",
+                "name": "asset",
+                "type": "uint8"
+            }
+        ],
+        "name": "getLiquidationPrice",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "enum Utils.Asset",
+                "name": "asset",
+                "type": "uint8"
+            }
+        ],
+        "name": "getLongOI",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "enum Utils.Asset",
+                "name": "asset",
+                "type": "uint8"
+            }
+        ],
+        "name": "getOpenInterest",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "longUsd",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "shortUsd",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "enum Utils.Asset",
+                "name": "asset",
+                "type": "uint8"
+            },
+            {
+                "internalType": "address",
+                "name": "user",
+                "type": "address"
+            }
+        ],
+        "name": "getPnL",
+        "outputs": [
+            {
+                "internalType": "int256",
+                "name": "",
+                "type": "int256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "getPoolUtilization",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "user",
+                "type": "address"
+            },
+            {
+                "internalType": "enum Utils.Asset",
+                "name": "asset",
+                "type": "uint8"
+            }
+        ],
+        "name": "getPosition",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "sizeUsd",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "collateral",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "entryPrice",
+                "type": "uint256"
+            },
+            {
+                "internalType": "int256",
+                "name": "entryFundingRate",
+                "type": "int256"
+            },
+            {
+                "internalType": "bool",
+                "name": "isLong",
+                "type": "bool"
+            },
+            {
+                "internalType": "uint256",
+                "name": "lastBorrowingUpdate",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "enum Utils.Asset",
+                "name": "asset",
+                "type": "uint8"
+            }
+        ],
+        "name": "getVaultHedgePnL",
+        "outputs": [
+            {
+                "internalType": "int256",
+                "name": "pnl",
+                "type": "int256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "enum Utils.Asset",
+                "name": "asset",
+                "type": "uint8"
+            }
+        ],
+        "name": "getVaultHedgePosition",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "sizeUsd",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "collateral",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "entryPrice",
+                "type": "uint256"
+            },
+            {
+                "internalType": "int256",
+                "name": "currentPnL",
+                "type": "int256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "currentValue",
+                "type": "uint256"
+            },
+            {
+                "internalType": "bool",
+                "name": "exists",
+                "type": "bool"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "enum Utils.Asset",
+                "name": "asset",
+                "type": "uint8"
+            }
+        ],
+        "name": "getVaultHedgeValue",
+        "outputs": [
+            {
+                "internalType": "int256",
+                "name": "hedgeValue",
+                "type": "int256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "enum Utils.Asset",
+                "name": "asset",
+                "type": "uint8"
+            }
+        ],
+        "name": "hasVaultHedge",
+        "outputs": [
+            {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "enum Utils.Asset",
+                "name": "asset",
+                "type": "uint8"
+            },
+            {
+                "internalType": "uint256",
+                "name": "addedSizeUsd",
+                "type": "uint256"
+            }
+        ],
+        "name": "increasePosition",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "user",
+                "type": "address"
+            },
+            {
+                "internalType": "enum Utils.Asset",
+                "name": "asset",
+                "type": "uint8"
+            }
+        ],
+        "name": "isLiquidatable",
+        "outputs": [
+            {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "isPaused",
+        "outputs": [
+            {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "enum Utils.Asset",
+                "name": "",
+                "type": "uint8"
+            }
+        ],
+        "name": "lastFundingUpdate",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "user",
+                "type": "address"
+            },
+            {
+                "internalType": "enum Utils.Asset",
+                "name": "asset",
+                "type": "uint8"
+            }
+        ],
+        "name": "liquidate",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "user",
+                "type": "address"
+            },
+            {
+                "internalType": "uint8",
+                "name": "assetId",
+                "type": "uint8"
+            }
+        ],
+        "name": "liquidateFromZK",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "liquidationFeeBps",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "enum Utils.Asset",
+                "name": "",
+                "type": "uint8"
+            }
+        ],
+        "name": "longOpenInterestTokens",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "enum Utils.Asset",
+                "name": "",
+                "type": "uint8"
+            }
+        ],
+        "name": "longOpenInterestUsd",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "maxUtilizationBps",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "minCollateralRatioBps",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "enum Utils.Asset",
+                "name": "",
+                "type": "uint8"
+            }
+        ],
+        "name": "netLongPositions",
+        "outputs": [
+            {
+                "internalType": "int256",
+                "name": "",
+                "type": "int256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "enum Utils.Asset",
+                "name": "",
+                "type": "uint8"
+            }
+        ],
+        "name": "netShortPositions",
+        "outputs": [
+            {
+                "internalType": "int256",
+                "name": "",
+                "type": "int256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "nextVaultPositionId",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "openFeeBps",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "enum Utils.Asset",
+                "name": "asset",
+                "type": "uint8"
+            },
+            {
+                "internalType": "uint256",
+                "name": "collateralAmount",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "sizeUsd",
+                "type": "uint256"
+            },
+            {
+                "internalType": "bool",
+                "name": "isLong",
+                "type": "bool"
+            }
+        ],
+        "name": "openPosition",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "enum Utils.Asset",
+                "name": "asset",
+                "type": "uint8"
+            },
+            {
+                "internalType": "uint256",
+                "name": "hedgeAmount",
+                "type": "uint256"
+            }
+        ],
+        "name": "openVaultHedge",
+        "outputs": [
+            {
+                "internalType": "bytes32",
+                "name": "positionId",
+                "type": "bytes32"
+            }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "owner",
+        "outputs": [
+            {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "pause",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "perpEngineZk",
+        "outputs": [
+            {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "pool",
+        "outputs": [
+            {
+                "internalType": "contract ILiquidityPool",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+            },
+            {
+                "internalType": "enum Utils.Asset",
+                "name": "",
+                "type": "uint8"
+            }
+        ],
+        "name": "positions",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "sizeUsd",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "collateral",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "entryPrice",
+                "type": "uint256"
+            },
+            {
+                "internalType": "int256",
+                "name": "entryFundingRate",
+                "type": "int256"
+            },
+            {
+                "internalType": "bool",
+                "name": "isLong",
+                "type": "bool"
+            },
+            {
+                "internalType": "uint256",
+                "name": "lastBorrowingUpdate",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "enum Utils.Asset",
+                "name": "asset",
+                "type": "uint8"
+            },
+            {
+                "internalType": "uint256",
+                "name": "reduceSizeUsd",
+                "type": "uint256"
+            }
+        ],
+        "name": "reducePosition",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "_netReturn",
+                "type": "uint256"
+            },
+            {
+                "internalType": "int256",
+                "name": "_pnl",
+                "type": "int256"
+            }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "renounceOwnership",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "uint256",
+                "name": "_borrowingRateAnnualBps",
+                "type": "uint256"
+            }
+        ],
+        "name": "setBorrowingRateAnnualBps",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "uint256",
+                "name": "sensitivity",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "minCR",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "maxUtil",
+                "type": "uint256"
+            }
+        ],
+        "name": "setConfig",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "_executor",
+                "type": "address"
+            }
+        ],
+        "name": "setExecutor",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "_receiver",
+                "type": "address"
+            }
+        ],
+        "name": "setFeeReceiver",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "uint256",
+                "name": "_open",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "_close",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "_liq",
+                "type": "uint256"
+            }
+        ],
+        "name": "setFees",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "_perpEngineZk",
+                "type": "address"
+            }
+        ],
+        "name": "setPerpEngineZk",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "_vaultAddress",
+                "type": "address"
+            }
+        ],
+        "name": "setVaultAddress",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "enum Utils.Asset",
+                "name": "",
+                "type": "uint8"
+            }
+        ],
+        "name": "shortOpenInterestUsd",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "newOwner",
+                "type": "address"
+            }
+        ],
+        "name": "transferOwnership",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "unpause",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "vaultAddress",
+        "outputs": [
+            {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+            },
+            {
+                "internalType": "enum Utils.Asset",
+                "name": "",
+                "type": "uint8"
+            }
+        ],
+        "name": "vaultHedgePositions",
+        "outputs": [
+            {
+                "internalType": "bytes32",
+                "name": "",
+                "type": "bytes32"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "enum Utils.Asset",
+                "name": "asset",
+                "type": "uint8"
+            },
+            {
+                "internalType": "uint256",
+                "name": "amount",
+                "type": "uint256"
+            }
+        ],
+        "name": "withdrawCollateral",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    }
+]

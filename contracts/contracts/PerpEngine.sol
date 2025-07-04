@@ -28,7 +28,6 @@ interface IChainLinkManager {
 
 interface IVault {
     function syncFundingPnL(Utils.Asset asset, int256 fundingDelta) external;
-    function syncFee(Utils.Asset asset, uint256 feeAmount) external;
 }
 
 contract PerpEngine is Ownable, ReentrancyGuard {
@@ -64,9 +63,20 @@ contract PerpEngine is Ownable, ReentrancyGuard {
     IERC20 public immutable collateralToken;
     ILiquidityPool public immutable pool;
     IChainLinkManager public immutable chainlinkManager;
-    address public protocolAccounting;
+    address public perpEngineZk; // Address of the privacy layer
     address public vaultAddress;
     address public feeReceiver;  // Protocol treasury address
+    address public executor;
+
+    // --- Positions ---
+    struct Position {
+        uint256 sizeUsd;
+        uint256 collateral;
+        uint256 entryPrice;
+        int256 entryFundingRate;
+        bool isLong;
+        uint256 lastBorrowingUpdate; 
+    }
 
     // --- Funding Rate State ---
     mapping(Utils.Asset => int256) public cumulativeFundingRate; // 1e18 scaled
@@ -77,15 +87,8 @@ contract PerpEngine is Ownable, ReentrancyGuard {
     mapping(Utils.Asset => uint256) public longOpenInterestTokens;  // Token amount held by longs (usd / price)
     mapping(Utils.Asset => uint256) public shortOpenInterestUsd;    // Total $ value of short positions
 
-    // --- Positions ---
-    struct Position {
-        uint256 sizeUsd;
-        uint256 collateral;
-        uint256 entryPrice;
-        int256 entryFundingRate;
-        bool isLong;
-        uint256 lastBorrowingUpdate;  // timestamp
-    }
+    mapping(Utils.Asset => int256) public netLongPositions;   // Net long exposure in tokens
+    mapping(Utils.Asset => int256) public netShortPositions;  // Net short exposure in USD
 
     mapping(address => mapping(Utils.Asset => bytes32)) public vaultHedgePositions;
     uint256 private nextVaultPositionId = 1000000; // Start vault positions at 1M to avoid conflicts
@@ -108,19 +111,27 @@ contract PerpEngine is Ownable, ReentrancyGuard {
     event VaultHedgeIncreased(address indexed vault, Utils.Asset asset, uint256 additionalAmount, uint256 newSize);
     event VaultHedgePartialClose(address indexed vault, Utils.Asset asset, uint256 closeAmount, uint256 actualReturn, int256 pnl);
     event PositionLiquidated(address indexed user, Utils.Asset asset, uint256 positionSize, uint256 penalty);
+    event PrivateBatchProcessed(uint8[] assetIds, int256[] netDeltas);
+    event ZKLiquidationExecuted(uint8 assetId, int256 sizetoClose, uint256 marginToTransfer);
 
     modifier onlyVault() {
         require(msg.sender == vaultAddress, "Only vault");
         _;
     }
 
+    modifier onlyZKContract() {
+        require(msg.sender == perpEngineZk, "Only ZK contract");
+        _;
+    }
+
     // --- Constructor ---
-    constructor(address _collateral, address _pool, address _chainlinkManager, address _vaultAddress, address _feeReceiver) Ownable(msg.sender) {
+    constructor(address _collateral, address _pool, address _chainlinkManager, address _vaultAddress, address _feeReceiver, address _executor) Ownable(msg.sender) {
         collateralToken = IERC20(_collateral);
         pool = ILiquidityPool(_pool);
         chainlinkManager = IChainLinkManager(_chainlinkManager);
         vaultAddress = _vaultAddress;
         feeReceiver = _feeReceiver;
+        executor = _executor;
     }
 
     // --------------------------------------------------------
@@ -274,7 +285,6 @@ contract PerpEngine is Ownable, ReentrancyGuard {
         if (fee >= pos.collateral) revert FeeIsGreaterThanCollateral();
         pos.collateral -= fee;
 
-        IVault(vaultAddress).syncFee(asset, fee);
         pos.lastBorrowingUpdate = block.timestamp;
     }
 
@@ -309,6 +319,49 @@ contract PerpEngine is Ownable, ReentrancyGuard {
         uint256 utilizationCap = (totalLiquidity * maxUtilizationBps) / 10000;
 
         if(totalProjectedOI > utilizationCap) revert ExceedsUtilization();
+    }
+
+    /**
+     * @notice Apply net delta from private trades (called by PerpEngineZK)
+     * @param assetId The asset being traded
+     * @param qtyDelta Net quantity change from private trades batch
+     * @param marginDelta Net margin change from private trades batch
+     * 
+     * This function handles:
+     * - Updating open interest based on net position changes
+     * - Managing liquidity pool reserves
+     * - All existing PerpEngine accounting automatically applies
+     */
+    function applyNetDelta(
+        uint8 assetId,
+        int256 qtyDelta,
+        int256 marginDelta
+    ) external onlyZKContract nonReentrant {
+        Utils.Asset asset = Utils.Asset(assetId);
+        
+        // Update open interest tracking
+        if (qtyDelta != 0) {
+            uint256 currentPrice = chainlinkManager.getPrice(asset);
+            
+            if (qtyDelta > 0) {
+                // Net increase in long positions
+                longOpenInterestUsd[asset] += uint256(qtyDelta);
+                longOpenInterestTokens[asset] += (uint256(qtyDelta) * 1e18) / currentPrice;
+            } else {
+                // Net increase in short positions  
+                shortOpenInterestUsd[asset] += uint256(-qtyDelta);
+            }
+        }
+
+        // Handle liquidity pool changes
+        if (marginDelta > 0) {
+            // Net margin added to system (traders deposited more than withdrew)
+            collateralToken.safeTransferFrom(msg.sender, feeReceiver, uint256(marginDelta));
+            pool.reserve(uint256(marginDelta));
+        } else if (marginDelta < 0) {
+            // Net margin removed from system (traders withdrew more than deposited)
+            pool.releaseTo(executor, uint256(-marginDelta));
+        }
     }
 
     /// --- Position Opening ---
@@ -598,8 +651,14 @@ contract PerpEngine is Ownable, ReentrancyGuard {
         pos.collateral -= proportionalCollateral;
 
         if (pos.isLong) {
-            longOpenInterestUsd[asset] -= reduceSizeUsd;
-            longOpenInterestTokens[asset] -= (reduceSizeUsd * 1e18) / entry;
+                longOpenInterestUsd[asset] -= reduceSizeUsd;
+    
+                uint256 tokensToReduce = (reduceSizeUsd * 1e18) / entry;
+                if (tokensToReduce >= longOpenInterestTokens[asset]) {
+                    longOpenInterestTokens[asset] = 0;
+                } else {
+                    longOpenInterestTokens[asset] -= tokensToReduce;
+                }
         } else {
             shortOpenInterestUsd[asset] -= reduceSizeUsd;
         }
@@ -709,6 +768,44 @@ contract PerpEngine is Ownable, ReentrancyGuard {
         emit PositionLiquidated(user, asset, positionSize, penalty);
     }
 
+    function liquidateFromZK(
+        uint8 assetId,
+        int256 sizeToClose,
+        uint256 marginToTransfer
+    ) external onlyZKContract nonReentrant {
+        Utils.Asset asset = Utils.Asset(assetId);
+        uint256 currentPrice = chainlinkManager.getPrice(asset);
+        
+        // Update open interest - reduce by the liquidated position size
+        if (sizeToClose > 0) {
+            // Liquidating a long position
+            uint256 positionSizeUint = uint256(sizeToClose);
+            longOpenInterestUsd[asset] = longOpenInterestUsd[asset] > positionSizeUint 
+                ? longOpenInterestUsd[asset] - positionSizeUint 
+                : 0;
+            longOpenInterestTokens[asset] = longOpenInterestTokens[asset] > (positionSizeUint * 1e18) / currentPrice
+                ? longOpenInterestTokens[asset] - (positionSizeUint * 1e18) / currentPrice
+                : 0;
+        } else if (sizeToClose < 0) {
+            // Liquidating a short position
+            uint256 positionSizeUint = uint256(-sizeToClose);
+            shortOpenInterestUsd[asset] = shortOpenInterestUsd[asset] > positionSizeUint
+                ? shortOpenInterestUsd[asset] - positionSizeUint
+                : 0;
+        }
+        
+        if (marginToTransfer > 0) {
+            // Return remaining margin to liquidity pool
+            pool.releaseTo(executor,marginToTransfer);
+        }
+        
+        emit ZKLiquidationExecuted(
+            assetId,
+            sizeToClose,
+            marginToTransfer
+        );
+    }
+
     function _calculatePositionPnL(Position memory pos, uint256 currentPrice) internal pure returns (int256 pnl) {
         if (pos.sizeUsd == 0) return 0;
         
@@ -763,7 +860,8 @@ contract PerpEngine is Ownable, ReentrancyGuard {
         uint256 collateral,
         uint256 entryPrice,
         int256 entryFundingRate,
-        bool isLong
+        bool isLong,
+        uint256 lastBorrowingUpdate
     ) {
         Position memory p = positions[user][asset];
         return (
@@ -771,7 +869,8 @@ contract PerpEngine is Ownable, ReentrancyGuard {
             p.collateral,
             p.entryPrice,
             p.entryFundingRate,
-            p.isLong
+            p.isLong,
+            p.lastBorrowingUpdate
         );
     }
 
@@ -963,5 +1062,17 @@ contract PerpEngine is Ownable, ReentrancyGuard {
         emit VaultHedgeClosed(vaultAddress, asset, positionSize);
         
         return collateral;
+    }
+
+    /**
+     * @notice Set the PerpEngineZK contract address (one-time setup)
+     */
+    function setPerpEngineZk(address _perpEngineZk) external onlyOwner {
+        require(perpEngineZk == address(0), "Already set"); // Can only be set once
+        perpEngineZk = _perpEngineZk;
+    }
+
+    function setExecutor(address _executor) external onlyOwner {
+        executor = _executor;
     }
 }

@@ -1,0 +1,17 @@
+{
+  "positions": {},
+  "balances": {},
+  "batches": [],
+  "trades": [],
+  "merkleState": {
+    "root": "0x2134e76ac5d21aab186c2be1dd8f84ee880a1e46eaf712f9d371b6df22191f3e",
+    "depth": 20,
+    "nextLeafIndex": 0,
+    "lastUpdate": 1750845938917
+  },
+  "config": {
+    "lastProcessedBlock": 0,
+    "executorAddress": "",
+    "initialized": true
+  }
+}
