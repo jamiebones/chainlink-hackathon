@@ -4,20 +4,16 @@
       "total": "1000000000",
       "available": "1000000000",
       "locked": "0",
-      "lastUpdate": 1751174516867
-    }
-  },
-  "positions": {
-    "0x14d24c79be77cd4fe8d544cad5ab0b7b0acd50fe-0": {
-      "trader": "0x14D24C79be77CD4fE8d544CAd5ab0b7b0aCd50Fe",
-      "assetId": 0,
-      "size": "-750000000",
-      "margin": "74250000",
-      "entryPrice": "327550000000000000000",
-      "lastUpdate": 1751174509066
+      "lastUpdate": 1751024225915
+    },
+    "0x072ecc90fa0ac2292e760a57304a87ad6c32bc89": {
+      "total": "4000000",
+      "available": "4000000",
+      "locked": "0",
+      "lastUpdate": 1751220992506
     }
   },
   "config": {
-    "lastBackup": 1751174516868
+    "lastBackup": 1751220992506
   }
 }

@@ -1,165 +1,273 @@
-# Chainlink Hackathon Monorepo
+# ψ psiX – Private Synthetic Equities & Perpetual DEX
 
-A Turbo-powered monorepo containing a complete Web3 application stack with smart contracts, subgraph indexing, and a modern frontend.
+> **Where synthetic stocks meet stealth trading.**  
+> Mint sTSLA & sAAPL, provide USDC liquidity, and trade perps in **public** or **fully private** mode — powered by Chainlink CCIP, HPKE encryption, and zkSNARK-verified liquidations.
 
-## 🚀 Project Structure
+---
+## Deployments
+- Frontend- https://psix-v1.vercel.app/ 
+- Backend-  https://psix-backend.onrender.com
+## 🚀 Overview
+psiX lets anyone:
 
-```
-chainlink-hackathon-monorepo/
-├── contracts/          # Hardhat project for smart contracts
-├── subgraph/          # The Graph protocol subgraph
-├── frontend/          # Next.js frontend application
-├── package.json       # Root package configuration
-└── turbo.json        # Turbo build configuration
-```
+1. **Mint synthetic equities** (sTSLA, sAAPL) with 110 % USDC collateral with a 10% buffer.  
+2. **Trade perpetual futures** on the same assets (plus ETH & BTC) via our custom **PerpEngine**.  
+3. Choose **Public Mode** (gas-efficient, transparent) or **Private Mode** (encryption + zk proofs).  
+4. Earn yield by **providing USDC liquidity** to back leveraged traders.
 
-## 📦 What's Inside
+Deployed on Avalanche Fuji; cross-chain minting from Sepolia via Chainlink CCIP.
 
-This monorepo includes the following packages and applications:
+---
 
-- **`contracts`**: Hardhat-based smart contract development environment
-- **`subgraph`**: The Graph protocol subgraph for indexing blockchain data
-- **`frontend`**: Next.js application with TypeScript, Tailwind CSS, and modern tooling
+## ✨ Core Features
+| 📌 Module         | What it does                                                              | Key Contracts |
+|-------------------|---------------------------------------------------------------------------|---------------|
+| **Vault**         | Mints/burns sEquity, routes 1× hedge, holds 10 % funding buffer           | `Vault.sol`   |
+| **PerpEngine**    | Long/short perps, funding, liquidations, oracle checks                    | `PerpEngine.sol` |
+| **LiquidityPool** | USDC pool for PerpEngine PnL & LP rewards                                 | `LiquidityPool.sol` |
+| **Privacy Layer** | HPKE-encrypted commit-reveal, BatchBot netting, zk liquidation proofs     | `BatchBot.ts`, `PerpEngineZK.verifier` |
+| **CCIP Bridge**   | Cross-chain mint/redeem (Sepolia ⇄ Fuji)                                   | `openPositionViaCCIP()` |
 
-## 🛠️ Development Setup
+---
+
+## 🛠 Technical Stack
+- **Smart Contracts:** Solidity 0.8.x, Foundry tests  
+- **Backend / Bots:** TypeScript, Node 22, BatchBot, Poseidon HPKE service, Chainlink Functions  
+- **Frontend:** Next.js 18, Tailwind CSS, wagmi, viem  
+- **Infra:** Hardhat devnet, Dockerised Poseidon, CCIP Router, Avalanche Subnet (future)  
+- **ZK:** snarkjs + circom 2 for liquidation proofs  
+
+---
+
+## 🔄 User Workflows & Flow-Charts
+
+<details open><summary><strong>1 – Mint & Redeem</strong></summary>
+
+~~~mermaid
+sequenceDiagram
+    autonumber
+    actor User
+    participant Vault
+    participant PerpEngine
+    participant Buffer
+
+    User->>Vault: mint(110 USDC)
+    Vault->>PerpEngine: openHedge(100 USDC long)
+    Vault->>Buffer: hold 10 USDC
+    Vault-->>User: sTSLA / sAAPL
+
+    User->>Vault: redeem()
+    Vault->>PerpEngine: closeHedge()
+    Vault-->>User: 110 USDC ± funding
+~~~
+</details>
+
+<details><summary><strong>2 – Add / Withdraw Liquidity</strong></summary>
+
+~~~mermaid
+sequenceDiagram
+    autonumber
+    actor LP as Liquidity Provider
+    participant LiquidityPool
+    participant PerpEngine
+
+    LP->>LiquidityPool: deposit(USDC)
+    LiquidityPool-->>LP: mint LP tokens
+    PerpEngine-->>LiquidityPool: settle fees + funding
+    LP->>LiquidityPool: withdraw()
+    LiquidityPool-->>LP: USDC + rewards
+~~~
+</details>
+
+<details><summary><strong>3 – Public Perp Trading</strong></summary>
+
+~~~mermaid
+sequenceDiagram
+    autonumber
+    participant Trader
+    participant PerpEngine
+    participant Oracle
+
+    Trader->>PerpEngine: openPosition(size, dir)
+    loop Funding
+        Oracle-->>PerpEngine: price
+        PerpEngine-->>Trader: funding PnL
+    end
+    Trader->>PerpEngine: reduce / close
+~~~
+</details>
+
+<details><summary><strong>4 – Private Perp Trading</strong></summary>
+
+~~~mermaid
+sequenceDiagram
+    autonumber
+    participant Trader
+    participant Wallet
+    participant BatchBot
+    participant Poseidon
+    participant PerpEngine
+    participant Verifier
+
+    Trader->>Wallet: encOpenOrder + sig (HPKE)
+    Wallet->>BatchBot: submit commit
+    BatchBot->>Poseidon: decrypt & verify
+    Poseidon->>Poseidon: insert / update leaf
+    Poseidon->>PerpEngine: tradeNet(±Δ)
+    BatchBot->>Verifier: zkProof
+    Verifier-->>PerpEngine: verify OK
+~~~
+</details>
+
+---
+
+## 📝 Quick User Guides
+<details><summary><strong>Mint & Redeem</strong></summary>
+
+- **Mint:** Connect wallet → “Mint” → deposit ≥ 110 % collateral → confirm.  
+- **Redeem:** Click “Redeem” → select amount → burn sEquity → receive USDC.
+
+</details>
+
+<details><summary><strong>Public Perp Trade</strong></summary>
+
+1. Choose asset, size, direction.  
+2. Confirm (`openPosition` / `increase` / `reduce`).  
+3. Funding accrues; close anytime.
+
+</details>
+
+<details><summary><strong>Private Perp Trade</strong></summary>
+
+1. Toggle “Private”.  
+2. Deposit amount, then sign the encrypted commit with your burner wallet.  
+3. BatchBot settles; zk proof verifies; UI shows fill.
+
+</details>
+
+<details><summary><strong>Add / Withdraw Liquidity</strong></summary>
+
+Deposit USDC → receive LP tokens → earn fees & funding share → withdraw anytime.
+
+</details>
+
+---
+
+## 📂 Repository Structure
+~~~text
+├─ contracts/            # Solidity sources
+├─ frontend/             # Next.js app
+├─ backend/executor      # BatchBot, Executor Bot
+├─ backend/circuits      # ZK circuits
+└─ README.md
+~~~
+
+---
+
+## ⚙️ Getting Started
 
 ### Prerequisites
+| Tool | Version |
+|------|---------|
+| Node | ≥ 22 |
+| pnpm | ≥ 9.14 |
+| Foundry | nightly |
+| Docker | for Poseidon dev-net |
 
-- Node.js 18+ 
-- npm or yarn
-- Git
+### 1 — Clone & Install
+~~~bash
+git clone https://github.com/your-org/psiX.git
+cd psiX
+pnpm install
+~~~
 
-### Installation
+### 2 — Local dev-chain
+~~~bash
+pnpm dev
+~~~
 
-1. Clone the repository and install dependencies:
+### 3 — Run tests
+~~~bash
+forge test -vv
+~~~
 
-```bash
-npm install
-```
+---
 
-This will install dependencies for all workspace packages.
+## 🔗 Contracts & Addresses (Fuji)
+| Contract      | Address                                      |
+|---------------|----------------------------------------------|
+| Vault         | `0xFeFf49844Cf2bd6c07806f86FcDeFE55786De8a4` |
+| PerpEngine    | `0xC707f6C9625B97FD9a214953528dfd846c2b2dD7` |
+| LiquidityPool | `0xD24FB6ebc087604af93D536B5A4562A0Dfa6Ab3a` |
+| PerpEngineZk  | `0xf5aD2EC0a0c763127667D71952CC80078356153c` |
+| SenderContract| `0x343d00b0c2fD67cA9dD1E34e2dA820F62f3f988F` |
+| MarketStatusOracle| `0xD1690b54a55A58df4440EE56969E3420198747D1` |
+| TslaPriceOralce| `0x70671A042B419B266d36212337eEC2A715Af603c` |
+| ApplPriceOracle| `0x76e6bf0aE87215ac57fE7ba900fD59Bab5C94eED` |
+| sTSLA | `0xffd0528B468E8820324dD27E71d68CC8d4F9Eb85` |
+| sAPPL| `0xba52894c5319d2263bcaAbF609767c33b3A04993` |
+| ReceiverContract(On sepolia)| `0xDbA42976c2139Ccc9450a5867bFEb214892b8d4D` |
 
-### Development Commands
+---
 
-- **`npm run dev`** - Start development servers for all applications
-- **`npm run build`** - Build all applications for production
-- **`npm run lint`** - Run linting across all packages
-- **`npm run test`** - Run tests across all packages
-- **`npm run clean`** - Clean build artifacts
+## 🧩 Peg Maintenance
+- Vault hedges 1× at mint → minimal delta.  
+- KeeperBots arbitrage ± 0.5 % peg drift.  
+- 10 % buffer covers funding swings.
 
-## 🏗️ Individual Package Commands
+---
 
-### Contracts (Hardhat)
+## 🔒 Privacy Mode Deep-Dive
+1. HPKE-encrypted commit signed with a burner wallet.  
+2. BatchBot forwards to **Poseidon**, which decrypts, verifies, and updates the Merkle tree.  
+3. Poseidon nets Δ and submits a single PerpEngine tx.  
+4. zkSNARK proof verified on-chain; no trade details leaked.
 
-```bash
-cd contracts
-npm run compile    # Compile smart contracts
-npm run test      # Run contract tests
-npm run deploy    # Deploy contracts
-npm run node      # Start local Hardhat node
-```
+---
 
-### Subgraph (The Graph)
+## 🛡 Security Considerations
+- Overflow-safe math; no unchecked external calls.  
+- Role-based access for CCIP router & KeeperBots.  
+- Foundry fuzz tests on funding, collateral, and liquidations.  
+- Audit before mainnet.
 
-```bash
-cd subgraph
-npm run codegen        # Generate types from schema
-npm run build         # Build the subgraph
-npm run deploy-local  # Deploy to local Graph Node
-```
+---
 
-### Frontend (Next.js)
+## 🗺️ Roadmap
 
-```bash
-cd frontend
-npm run dev          # Start development server
-npm run build        # Build for production
-npm run start        # Start production server
-npm run lint         # Run ESLint
-```
+### Completed ✅
+- [x] **MVP Launch** - synthetic assets on Avalanche Fuji
+- [x] **Fully-Functional Perpetuals on Fuji**   
+- [x] **Cross-Chain Bridge** - CCIP integration with Ethereum Sepolia
+- [x] **Private Mode Beta** - HPKE encryption + ZK proof batching + liquidation with ZK proofs
 
-## 🔧 Configuration
+### **Q3 2025: Perpetuals** 🚀
+- Expand beyond synthetic equities to crypto perpetuals
+- Higher volume/liquidity crypto markets
+- Leverage existing privacy infrastructure for BTC/ETH trading
 
-### Turbo Configuration
-
-The monorepo uses Turbo for efficient builds and caching. The configuration is in `turbo.json`:
-
-- **Build pipeline**: Optimized dependency resolution and parallel execution
-- **Caching**: Intelligent caching of build outputs
-- **Development mode**: Hot reloading across all applications
-
-### Workspace Configuration
-
-Each package is configured as a workspace in the root `package.json`, enabling:
-
-- Shared dependencies
-- Cross-package imports
-- Unified script execution
-
-## 🚀 Getting Started
-
-1. **Start the development environment**:
-   ```bash
-   npm run dev
-   ```
-
-2. **Deploy smart contracts** (in a new terminal):
-   ```bash
-   cd contracts
-   npm run node      # Start local blockchain
-   npm run deploy    # Deploy contracts
-   ```
-
-3. **Set up the subgraph** (in a new terminal):
-   ```bash
-   cd subgraph
-   # Update subgraph.yaml with deployed contract address
-   npm run codegen
-   npm run build
-   ```
-
-4. **Access the applications**:
-   - Frontend: http://localhost:3000
-   - Hardhat Network: http://localhost:8545
-
-## 📝 Development Workflow
-
-1. **Smart Contract Development**: Write and test contracts in the `contracts/` directory
-2. **Subgraph Development**: Update schema and mappings in `subgraph/` to index contract events
-3. **Frontend Development**: Build the user interface in `frontend/` directory
-4. **Integration**: Use Turbo commands to run and build all applications together
-
-## 🧪 Testing
-
-Run tests across all packages:
-
-```bash
-npm run test
-```
-
-Or test individual packages:
-
-```bash
-cd contracts && npm test
-cd frontend && npm test
-```
-
-## 📚 Tech Stack
-
-- **Monorepo**: Turbo
-- **Smart Contracts**: Hardhat, Solidity
-- **Indexing**: The Graph Protocol
-- **Frontend**: Next.js, TypeScript, Tailwind CSS
-- **Package Manager**: npm workspaces
+### **Q4 2025: Security Improvements** ⛓️
+- Custom Avalanche subnet for private trading
+- Lower costs & higher throughput
+- Enhanced privacy with custom consensus
+  
+---
 
 ## 🤝 Contributing
+PRs welcome — run `pnpm lint && pnpm test` first.
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Run tests and linting
-5. Submit a pull request
+---
+
+## 👥 Team
+| Name        | Role                              | X / LinkedIn |
+|-------------|-----------------------------------|--------------|
+| **Lakshya** | Protocol Design & Project Manager | [LinkedIn](https://www.linkedin.com/in/lakshya-jindal-gupta-1b8134220/) |
+| **James**   | Smart Contract Developer          | [X](https://x.com/jamiescript) |
+| **Rohith**  | PerpEngine & Risk                 | [LinkedIn](https://www.linkedin.com/in/rohithnarahari/) |
+| **Anushka** | ZK Circuits & Chainlink           | [LinkedIn](https://www.linkedin.com/in/anushka-somani1/) |
+| **Keshav**  | Frontend                          | [LinkedIn](https://www.linkedin.com/in/keshav-bhotika-0807a61b8/) |
+
+---
 
 ## 📄 License
-
-MIT License - see LICENSE file for details. 
+MIT © 2025 psiX Labs

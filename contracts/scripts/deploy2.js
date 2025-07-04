@@ -14,7 +14,7 @@ const colors = {
   cyan: "\x1b[36m"
 };
 
-const receiverContractAddress = "0x60D5A7f7f49D307e36AadAd994EF2e164a42BA54";  //address of the receiver contract on Fuji
+const receiverContractAddress = "0xDbA42976c2139Ccc9450a5867bFEb214892b8d4D";  //address of the receiver contract on Fuji
 
 //const { router, donId, gasLimit } = network.config;
 
@@ -180,3 +180,5 @@ main()
     console.error(error);
     process.exit(1);
   });
+
+

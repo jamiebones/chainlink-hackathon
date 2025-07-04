@@ -1,47 +1,25 @@
 {
   "network": "fuji",
   "chainId": 43113,
-<<<<<<< HEAD
-  "deployer": "0x14D24C79be77CD4fE8d544CAd5ab0b7b0aCd50Fe",
-  "timestamp": "2025-06-26T09:39:25.128Z",
-  "contracts": {
-    "usdc": "0xf5fCE270b86E5e6AC7faf6E6C6D9fb5D3943693A",
-    "marketStatusOracle": "0x8Ab3eFa446799552F214f68fdA72B67Ad55651da",
-    "tslaOracle": "0xfb444bf6425d9d65f681680b444e37c17059dBf2",
-    "aaplOracle": "0xB1D19ed4718Cbd774AfEfA5CBa8f6B64E91E5F71",
-    "chainlinkManager": "0x1f2B64f9Eb02363aE63557d222D0676c2aCa64d1",
-    "liquidityPool": "0x6B3b404fCe24578aF45188A9f44b87aC5adC8f23",
-    "vault": "0x902Cd7068D6119ceE2Dbd66de8A54e7247198175",
-    "perpEngine": "0x03D4Ec3Bc490D6D9Cd6D2C245269363B611Af01b",
-    "perpEngineZk": "0x7DeCCb8C97920E3B5c7576566f1E5bB84fE69d35",
-    "sTSLA": "0x6377Ac0e3ba45C28b8752a2d98DC9701ab1FcAdA",
-    "sAPPL": "0x7DBeBC457c5f252dE13c4EF3ee807d4CD1AdFB8a"
-  },
-  "configuration": {
-    "initialLiquidityUSDC": "1000000000",
-    "oracleWindowSize": 60,
-    "feeReceiver": "0x71C70066F9D1128126a1A5e36Dee8FAfF4C55d30",
-    "lpProvider": "0x71C70066F9D1128126a1A5e36Dee8FAfF4C55d30"
-=======
   "deployer": "0x40BDC27880A522B4346844A96aDAB92DcEDB1664",
-  "timestamp": "2025-06-26T10:03:34.433Z",
+  "timestamp": "2025-06-29T08:30:08.446Z",
   "contracts": {
+    "liquidityPool": "0xD24FB6ebc087604af93D536B5A4562A0Dfa6Ab3a",
+    "vault": "0xFeFf49844Cf2bd6c07806f86FcDeFE55786De8a4",
+    "receiverContract": "0xDbA42976c2139Ccc9450a5867bFEb214892b8d4D",
+    "perpEngine": "0xC707f6C9625B97FD9a214953528dfd846c2b2dD7",
+    "perpEngineZk": "0xf5aD2EC0a0c763127667D71952CC80078356153c",
+    "sTSLA": "0xffd0528B468E8820324dD27E71d68CC8d4F9Eb85",
+    "sAPPL": "0xba52894c5319d2263bcaAbF609767c33b3A04993",
     "marketStatusOracle": "0xD1690b54a55A58df4440EE56969E3420198747D1",
     "tslaOracle": "0x70671A042B419B266d36212337eEC2A715Af603c",
     "aaplOracle": "0x76e6bf0aE87215ac57fE7ba900fD59Bab5C94eED",
-    "chainlinkManager": "0xf0371d57b1fb08Deaf1F3AbE37c1465dC4025c45",
-    "liquidityPool": "0xEBde46FDacdc2d029fee73AD6632527E4eeB87Ab",
-    "vault": "0x561B0fcC18D09dBa76c68Fa0910AcFf58A1EF6E2",
-    "receiverContract": "0x60D5A7f7f49D307e36AadAd994EF2e164a42BA54",
-    "perpEngine": "0x2c59F4032B279344491684e5d752d8cf1e5AE15a",
-    "sTSLA": "0xfc7897B507C48792f4f79314db675BD3708bc310",
-    "sAPPL": "0xe16E14443Be01FBDDf8fa1bEf0454a625ca9b678"
+    "chainlinkManager": "0xf0371d57b1fb08Deaf1F3AbE37c1465dC4025c45"
   },
   "configuration": {
-    "initialLiquidityUSDC": "2000000",
+    "initialLiquidityUSDC": "10000000",
     "oracleWindowSize": 10,
     "feeReceiver": "0x40BDC27880A522B4346844A96aDAB92DcEDB1664",
     "lpProvider": "0x40BDC27880A522B4346844A96aDAB92DcEDB1664"
->>>>>>> origin
   }
 }

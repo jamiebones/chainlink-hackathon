@@ -6,8 +6,8 @@ import { parseUnits } from 'viem'
 import poolAbiJson from '@/abis/LiquidityPool.json'
 import usdcAbiJson from '@/abis/MockERc20.json'
 
-const LIQ_POOL = '0x04825CDa198D4134f6Bb914f097b9ab141825bF4'
-const USDC_TOKEN = '0xae68c3d71bb66c75492Af7626c0eAAF918Ec4630'
+const LIQ_POOL = '0xD24FB6ebc087604af93D536B5A4562A0Dfa6Ab3a'
+const USDC_TOKEN = '0x5425890298aed601595a70AB815c96711a31Bc65'
 
 const POOL_ABI = poolAbiJson.abi
 const USDC_ABI = usdcAbiJson.abi
@@ -24,31 +24,25 @@ export default function DepositPage() {
       alert('⚠️ Please connect your wallet.')
       return
     }
-
     if (!amount || parseFloat(amount) <= 0) {
       alert('⚠️ Enter a valid amount.')
       return
     }
-
     const usdcAmount = parseUnits(amount, 6)
-
     try {
       setLoading(true)
-
       await writeContractAsync({
         address: USDC_TOKEN,
         abi: USDC_ABI,
         functionName: 'approve',
         args: [LIQ_POOL, usdcAmount],
       })
-
       await writeContractAsync({
         address: LIQ_POOL,
         abi: POOL_ABI,
         functionName: 'deposit',
-        args: [usdcAmount],
+        args: [1e6*amount],
       })
-
       alert('✅ Deposit successful!')
       setAmount('')
     } catch (err) {
@@ -60,37 +54,40 @@ export default function DepositPage() {
   }
 
   return (
-    <div className="max-w-md mx-auto py-12 px-6 text-white">
-      <h1 className="text-3xl font-bold mb-2">Deposit to Liquidity Pool</h1>
-      <p className="text-slate-400 mb-8 text-sm">
-        Provide USDC to earn fees from perpetual traders.
-      </p>
-
-      <div className="bg-slate-800 rounded-xl p-6 shadow-md border border-slate-700 space-y-6">
-        <div>
-          <label className="block text-sm font-medium mb-1 text-slate-300">USDC Amount</label>
-          <input
-            type="number"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            className="w-full px-4 py-2 bg-slate-900 text-white border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-            placeholder="Enter amount"
-            min="0"
-            step="0.01"
-          />
+    <div className="min-h-screen relative bg-gradient-to-br from-black via-slate-950/80 to-gray-950 overflow-hidden font-sans flex items-center justify-center">
+      {/* Animated star field */}
+      <div className="absolute inset-0 z-0 pointer-events-none">
+        <div className="absolute -top-32 -left-40 w-[600px] h-[500px] bg-gradient-to-tr from-purple-500/30 via-blue-600/15 to-transparent rounded-full blur-3xl animate-pulse" />
+        <div className="absolute top-2/3 right-1/4 w-[450px] h-[380px] bg-gradient-to-br from-pink-500/25 via-purple-400/10 to-transparent rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute top-1/4 left-2/3 w-[350px] h-[280px] bg-gradient-to-tl from-cyan-400/20 via-blue-300/5 to-transparent rounded-full blur-2xl animate-pulse" style={{ animationDelay: '2s' }} />
+        <div className="absolute bottom-1/4 left-1/4 w-[300px] h-[250px] bg-gradient-to-tr from-emerald-400/15 via-teal-300/8 to-transparent rounded-full blur-2xl animate-pulse" style={{ animationDelay: '0.5s' }} />
+      </div>
+      <div className="relative z-10 w-full max-w-md mx-auto glassy-card p-8 border border-slate-800/60 shadow-2xl backdrop-blur-xl">
+        <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-purple-200 to-blue-200 mb-2 text-center tracking-tight">Deposit to Liquidity Pool</h1>
+        <p className="text-slate-400 mb-8 text-base font-medium text-center">
+          Provide USDC to earn fees from perpetual traders.
+        </p>
+        <div className="space-y-6">
+          <div>
+            <label className="block text-sm font-semibold mb-1 text-slate-300 tracking-wide">USDC Amount</label>
+            <input
+              type="number"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-4 py-3 text-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-400/40"
+              placeholder="Enter amount"
+              min="0"
+              step="0.01"
+            />
+          </div>
+          <button
+            onClick={handleDeposit}
+            disabled={loading || !amount || parseFloat(amount) <= 0}
+            className={`w-full py-3 rounded-xl font-bold text-lg bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 text-white shadow-lg hover:from-pink-500 hover:to-purple-500 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-400/40 ${loading || !amount || parseFloat(amount) <= 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            {loading ? 'Processing...' : 'Deposit USDC'}
+          </button>
         </div>
-
-        <button
-          onClick={handleDeposit}
-          disabled={loading || !amount || parseFloat(amount) <= 0}
-          className={`w-full py-3 rounded-lg font-semibold text-sm transition-all duration-200 ${
-            loading || !amount || parseFloat(amount) <= 0
-              ? 'bg-slate-600 text-slate-400 cursor-not-allowed'
-              : 'bg-green-500 hover:bg-green-600 text-white'
-          }`}
-        >
-          {loading ? 'Processing...' : 'Deposit USDC'}
-        </button>
       </div>
     </div>
   )

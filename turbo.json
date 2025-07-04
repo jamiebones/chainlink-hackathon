@@ -30,5 +30,16 @@
         "clean": {
             "cache": false
         }
-    }
+    },
+    "globalEnv": [
+        "PORT",
+        "RPC_URL",
+        "EXECUTOR_PRIVATE_KEY",
+        "EXECUTOR_ADDRESS",
+        "USDC_ADDRESS",
+        "PERP_ENGINE_ADDRESS",
+        "PERP_ENGINE_ZK_ADDRESS",
+        "CHAINLINK_MANAGER_ADDRESS",
+        "LIQUIDITY_POOL_ADDRESS"
+    ]
 }

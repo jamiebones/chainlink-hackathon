@@ -126,7 +126,6 @@ contract VaultContractSender is OwnerIsCreator {
         delete s_receivers[_destinationChainSelector];
     }
 
-   
     function openPositionViaCCIP(
         PositionRequest calldata _request
     )
