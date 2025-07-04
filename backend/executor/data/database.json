@@ -4,7 +4,7 @@
   "batches": [],
   "trades": [],
   "merkleState": {
-    "root": "0x2134e76ac5d21aab186c2be1dd8f84ee880a1e46eaf712f9d371b6df22191f3e",
+    "root": "0x2e74227087beb7fc62ddd017758fb8408f395407302779b52b4372e1dcb9f379",
     "depth": 20,
     "nextLeafIndex": 0,
     "lastUpdate": 1750845938917

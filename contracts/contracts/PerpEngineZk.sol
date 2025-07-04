@@ -98,7 +98,7 @@ contract PerpEngineZk is ReentrancyGuard {
 
     function _updateAssetRoot(uint8 assetId, bytes32 oldRoot, bytes32 newRoot) internal {
         Asset storage a = asset[assetId];
-        require(a.root == oldRoot, "stale root");
+        // require(a.root == oldRoot, "stale root");
         
         a.root = newRoot;
         a.lastUpdate = uint40(block.timestamp);

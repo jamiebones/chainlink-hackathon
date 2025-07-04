@@ -1,10 +1,10 @@
 {
   "balances": {
     "0x14d24c79be77cd4fe8d544cad5ab0b7b0acd50fe": {
-      "total": "1000750000",
-      "available": "1000750000",
+      "total": "1000000000",
+      "available": "1000000000",
       "locked": "0",
-      "lastUpdate": 1751127694506
+      "lastUpdate": 1751174516867
     }
   },
   "positions": {
@@ -14,10 +14,10 @@
       "size": "-750000000",
       "margin": "74250000",
       "entryPrice": "327550000000000000000",
-      "lastUpdate": 1751127685935
+      "lastUpdate": 1751174509066
     }
   },
   "config": {
-    "lastBackup": 1751127694506
+    "lastBackup": 1751174516868
   }
 }

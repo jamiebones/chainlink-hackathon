@@ -119,6 +119,7 @@ export class ContractManager {
     }
 
     try {
+      
       console.log('📤 Submitting batch to PerpEngineZK...');
       console.log(`   Assets: [${assetIds.join(', ')}]`);
       console.log(`   Net deltas: [${netDeltas.map(d => this.formatDelta(d)).join(', ')}]`);
@@ -134,6 +135,8 @@ export class ContractManager {
         return mockTxHash;
       }
 
+      console.log("In contracts.ts: #####################" , assetIds, oldRoots, newRoots, netDeltas, marginDeltas); 
+      console.log("In contracts.ts: #####################" , this.perpEngineZK, this.signer, this.provider);
       // Submit transaction directly - user handles initialization
       const tx = await this.perpEngineZK.processBatch(
         assetIds,
@@ -143,8 +146,8 @@ export class ContractManager {
         marginDeltas,
         { 
           gasLimit: 1000000, // Fixed gas limit
-          maxFeePerGas: ethers.parseUnits('30', 'gwei'), // Fuji gas price
-          maxPriorityFeePerGas: ethers.parseUnits('2', 'gwei')
+          maxFeePerGas: ethers.parseUnits('100', 'gwei'), // Fuji gas price
+          maxPriorityFeePerGas: ethers.parseUnits('5', 'gwei')
         }
       );
 
